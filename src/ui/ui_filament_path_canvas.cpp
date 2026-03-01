@@ -162,6 +162,8 @@ struct FilamentPathData {
     void* slot_user_data = nullptr;
     filament_path_bypass_cb_t bypass_callback = nullptr;
     void* bypass_user_data = nullptr;
+    filament_path_buffer_cb_t buffer_callback = nullptr;
+    void* buffer_user_data = nullptr;
 
     // Theme-derived colors (cached for performance)
     lv_color_t color_idle;
@@ -2362,6 +2364,21 @@ static void filament_path_click_cb(lv_event_t* e) {
         }
     }
 
+    // Check if buffer coil was clicked
+    if (data->buffer_present && data->buffer_callback) {
+        int32_t buffer_y = y_off + (int32_t)(height * BUFFER_Y_RATIO);
+        int32_t hub_h = (int32_t)(height * HUB_HEIGHT_RATIO);
+        int32_t box_w = data->hub_width * 2 / 5;
+        int32_t box_h = hub_h * 55 / 100;
+        int32_t center_x = x_off + width / 2;
+        if (abs(point.x - center_x) < box_w / 2 + 4 &&
+            abs(point.y - buffer_y) < box_h / 2 + 4) {
+            spdlog::debug("[FilamentPath] Buffer coil clicked");
+            data->buffer_callback(data->buffer_user_data);
+            return;
+        }
+    }
+
     // Check if bypass spool box was clicked (right side) — check before entry area
     // Y-range guard because the spool box may be outside the slot entry area
     if (data->show_bypass && data->bypass_callback) {
@@ -2851,6 +2868,15 @@ void ui_filament_path_canvas_set_bypass_callback(lv_obj_t* obj, filament_path_by
     if (data) {
         data->bypass_callback = cb;
         data->bypass_user_data = user_data;
+    }
+}
+
+void ui_filament_path_canvas_set_buffer_callback(lv_obj_t* obj, filament_path_buffer_cb_t cb,
+                                                 void* user_data) {
+    auto* data = get_data(obj);
+    if (data) {
+        data->buffer_callback = cb;
+        data->buffer_user_data = user_data;
     }
 }
 
