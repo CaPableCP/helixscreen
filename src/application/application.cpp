@@ -367,6 +367,16 @@ int Application::run(int argc, char** argv) {
         return 1;
     }
 
+    // Set multi-printer subjects from config (needed for navbar badge binding)
+    {
+        auto printer_ids = m_config->get_printer_ids();
+        auto active_id = m_config->get_active_printer_id();
+        std::string printer_name =
+            m_config->get<std::string>(m_config->df() + "printer_name", active_id);
+        get_printer_state().set_active_printer_name(printer_name);
+        get_printer_state().set_multi_printer_enabled(printer_ids.size() > 1);
+    }
+
     // Phase 9b: Initialize Moonraker (creates client + API)
     // Now works because PrinterState exists from phase 9a
     if (!init_moonraker()) {
@@ -2622,6 +2632,16 @@ void Application::init_printer_state() {
         spdlog::error("[Application] Failed to reinitialize core subjects");
         ObserverGuard::revalidate_all();
         return;
+    }
+
+    // 2b. Set multi-printer subjects from config
+    {
+        auto printer_ids = m_config->get_printer_ids();
+        auto active_id = m_config->get_active_printer_id();
+        std::string printer_name =
+            m_config->get<std::string>(m_config->df() + "printer_name", active_id);
+        get_printer_state().set_active_printer_name(printer_name);
+        get_printer_state().set_multi_printer_enabled(printer_ids.size() > 1);
     }
 
     // 3. Initialize Moonraker (creates client + API + history managers)
