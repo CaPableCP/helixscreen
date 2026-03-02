@@ -3,9 +3,12 @@
 
 #include "panel_widget_registry.h"
 
+#include "favorite_macro_widget.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <iterator>
 #include <string_view>
 
 namespace helix {
@@ -56,8 +59,7 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     {"humidity",         "Humidity",          "water",            "Enclosure humidity sensor readings",           "Humidity",         "humidity_sensor_count", false, 1, 1, 1, 1, 2, 2},
     {"width_sensor",     "Width Sensor",      "ruler",            "Filament width sensor readings",               "Width Sensor",     "width_sensor_count", false, 1, 1, 1, 1, 2, 2},
     {"thermistor",       "Thermistor",        "thermometer",      "Monitor a custom temperature sensor",          "Thermistor",       "temp_sensor_count",  false, 1, 1, 1, 1, 2, 1},
-    {"favorite_macro_1", "Macro Button 1",    "play",             "Run a configured macro with one tap",          "Macro Button 1",   nullptr,              false, 1, 1, 1, 1, 2, 1},
-    {"favorite_macro_2", "Macro Button 2",    "play",             "Run a configured macro with one tap",          "Macro Button 2",   nullptr,              false, 1, 1, 1, 1, 2, 1},
+    // favorite_macro_1..5 generated in init_widget_registrations()
     {"clock",            "Digital Clock",     "clock",            "Current time and date",                       "Digital Clock",    nullptr,              false, 2, 1, 1, 1, 3, 3},
     {"job_queue",        "Job Queue",         "progress_clock",   "Queued print jobs",                           "Job Queue",        nullptr,              false, 2, 2, 2, 1, 4, 3},
     //                                                                                                                                          en  col row min_c min_r max_c max_r
@@ -105,12 +107,42 @@ void register_widget_subjects(std::string_view id, SubjectInitFn init_fn) {
     spdlog::warn("[PanelWidgetRegistry] Subject init registration failed: '{}' not found", id);
 }
 
+// Static string literals for favorite_macro IDs — must outlive the defs table.
+static const char* const kFavMacroIds[] = {
+    "favorite_macro_1", "favorite_macro_2", "favorite_macro_3",
+    "favorite_macro_4", "favorite_macro_5",
+};
+static_assert(std::size(kFavMacroIds) == kMaxFavoriteMacroSlots);
+
 void init_widget_registrations() {
     static bool initialized = false;
     if (initialized) {
         return;
     }
     initialized = true;
+
+    // Generate favorite_macro_1..5 defs and insert at the placeholder position
+    {
+        auto it = std::find_if(s_widget_defs.begin(), s_widget_defs.end(),
+                               [](const PanelWidgetDef& d) { return d.id == std::string_view("clock"); });
+        for (int i = kMaxFavoriteMacroSlots - 1; i >= 0; --i) {
+            PanelWidgetDef def{};
+            def.id = kFavMacroIds[i];
+            def.display_name = "Macro Button";
+            def.icon = "play";
+            def.description = "Run a configured macro with one tap";
+            def.translation_tag = "Macro Button";
+            def.default_enabled = false;
+            def.colspan = 1;
+            def.rowspan = 1;
+            def.min_colspan = 1;
+            def.min_rowspan = 1;
+            def.max_colspan = 2;
+            def.max_rowspan = 1;
+            def.catalog_group = "favorite_macro";
+            it = s_widget_defs.insert(it, def);
+        }
+    }
 
     register_printer_image_widget();
     register_print_status_widget();

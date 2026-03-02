@@ -25,17 +25,15 @@
 
 namespace helix {
 void register_favorite_macro_widgets() {
-    register_widget_factory("favorite_macro_1", []() {
-        return std::make_unique<FavoriteMacroWidget>("favorite_macro_1");
-    });
-    register_widget_factory("favorite_macro_2", []() {
-        return std::make_unique<FavoriteMacroWidget>("favorite_macro_2");
-    });
+    for (int i = 1; i <= kMaxFavoriteMacroSlots; ++i) {
+        std::string id = "favorite_macro_" + std::to_string(i);
+        register_widget_factory(id, [id]() {
+            return std::make_unique<FavoriteMacroWidget>(id);
+        });
+    }
     // Register XML callbacks early — before any XML is parsed
-    lv_xml_register_event_cb(nullptr, "favorite_macro_1_clicked_cb",
-                             FavoriteMacroWidget::clicked_1_cb);
-    lv_xml_register_event_cb(nullptr, "favorite_macro_2_clicked_cb",
-                             FavoriteMacroWidget::clicked_2_cb);
+    lv_xml_register_event_cb(nullptr, "favorite_macro_clicked_cb",
+                             FavoriteMacroWidget::clicked_cb);
     lv_xml_register_event_cb(nullptr, "fav_macro_picker_backdrop_cb",
                              FavoriteMacroWidget::picker_backdrop_cb);
 }
@@ -48,6 +46,21 @@ namespace {
 helix::MacroParamModal& get_shared_param_modal() {
     static helix::MacroParamModal modal;
     return modal;
+}
+
+/// Free heap-allocated macro name strings stored as user_data on picker rows.
+/// Called from both dismiss_macro_picker() and the LV_EVENT_DELETE handler.
+void cleanup_picker_row_strings(lv_obj_t* backdrop) {
+    lv_obj_t* macro_list = lv_obj_find_by_name(backdrop, "macro_list");
+    if (!macro_list)
+        return;
+    uint32_t count = lv_obj_get_child_count(macro_list);
+    for (uint32_t i = 0; i < count; ++i) {
+        lv_obj_t* row = lv_obj_get_child(macro_list, i);
+        auto* name_ptr = static_cast<std::string*>(lv_obj_get_user_data(row));
+        delete name_ptr;
+        lv_obj_set_user_data(row, nullptr);
+    }
 }
 } // namespace
 
@@ -365,23 +378,13 @@ void FavoriteMacroWidget::show_macro_picker() {
         picker_backdrop_,
         [](lv_event_t* e) {
             auto* self = static_cast<FavoriteMacroWidget*>(lv_event_get_user_data(e));
-            if (self) {
-                // Clean up heap-allocated strings before LVGL frees the tree
-                lv_obj_t* backdrop = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-                lv_obj_t* macro_list = lv_obj_find_by_name(backdrop, "macro_list");
-                if (macro_list) {
-                    uint32_t count = lv_obj_get_child_count(macro_list);
-                    for (uint32_t i = 0; i < count; ++i) {
-                        lv_obj_t* row = lv_obj_get_child(macro_list, i);
-                        auto* name_ptr = static_cast<std::string*>(lv_obj_get_user_data(row));
-                        delete name_ptr;
-                        lv_obj_set_user_data(row, nullptr);
-                    }
-                }
-                self->picker_backdrop_ = nullptr;
-                if (s_active_picker_ == self) {
-                    s_active_picker_ = nullptr;
-                }
+            if (!self)
+                return;
+            auto* backdrop = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+            cleanup_picker_row_strings(backdrop);
+            self->picker_backdrop_ = nullptr;
+            if (s_active_picker_ == self) {
+                s_active_picker_ = nullptr;
             }
         },
         LV_EVENT_DELETE, this);
@@ -425,16 +428,7 @@ void FavoriteMacroWidget::dismiss_macro_picker() {
     // Clean up heap-allocated macro name strings (only if object is still valid —
     // parent screen deletion auto-frees children, leaving stale pointers)
     if (lv_obj_is_valid(picker_backdrop_)) {
-        lv_obj_t* macro_list = lv_obj_find_by_name(picker_backdrop_, "macro_list");
-        if (macro_list) {
-            uint32_t count = lv_obj_get_child_count(macro_list);
-            for (uint32_t i = 0; i < count; ++i) {
-                lv_obj_t* row = lv_obj_get_child(macro_list, i);
-                auto* name_ptr = static_cast<std::string*>(lv_obj_get_user_data(row));
-                delete name_ptr;
-                lv_obj_set_user_data(row, nullptr);
-            }
-        }
+        cleanup_picker_row_strings(picker_backdrop_);
     }
 
     helix::ui::safe_delete(picker_backdrop_);
@@ -456,17 +450,8 @@ void FavoriteMacroWidget::select_macro(const std::string& name) {
 // Static event callbacks
 // ============================================================================
 
-void FavoriteMacroWidget::clicked_1_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] clicked_1_cb");
-    auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
-    if (widget) {
-        widget->handle_clicked();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void FavoriteMacroWidget::clicked_2_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] clicked_2_cb");
+void FavoriteMacroWidget::clicked_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] clicked_cb");
     auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
     if (widget) {
         widget->handle_clicked();

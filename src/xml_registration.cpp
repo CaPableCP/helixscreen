@@ -324,8 +324,7 @@ void register_xml_components() {
     register_xml("components/panel_widget_thermistor.xml");
     register_xml("components/panel_widget_fan_stack.xml");
     register_xml("components/panel_widget_fan_carousel.xml");
-    register_xml("components/panel_widget_favorite_macro_1.xml");
-    register_xml("components/panel_widget_favorite_macro_2.xml");
+    register_xml("components/panel_widget_favorite_macro.xml");
     register_xml("components/panel_widget_clock.xml");
     register_xml("components/panel_widget_tips.xml");
     register_xml("components/panel_widget_print_status.xml");
