@@ -2380,7 +2380,12 @@ void Application::handle_keyboard_shortcuts() {
         // S key - take screenshot
         shortcuts.register_key(SDL_SCANCODE_S, []() {
             spdlog::info("[Application] S key - taking screenshot");
-            helix::save_screenshot();
+            auto path = helix::save_screenshot();
+            if (!path.empty()) {
+                auto basename = path.substr(path.rfind('/') + 1);
+                auto msg = "Screenshot " + basename + " taken!";
+                ToastManager::instance().show(ToastSeverity::SUCCESS, msg.c_str(), 3000);
+            }
         });
 
         // M key - toggle memory stats
