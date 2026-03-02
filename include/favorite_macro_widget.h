@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "macro_param_cache.h"
 #include "macro_param_modal.h"
 #include "ui_observer_guard.h"
 
@@ -54,9 +55,6 @@ class FavoriteMacroWidget : public PanelWidget {
     lv_obj_t* name_label_ = nullptr;
 
     std::string macro_name_;                ///< Assigned macro (e.g., "CLEAN_NOZZLE")
-    std::vector<MacroParam> cached_params_; ///< Cached parsed parameters
-    bool params_cached_ = false;            ///< Whether params have been fetched
-
     std::shared_ptr<bool> alive_ = std::make_shared<bool>(false);
 
     // Picker context menu

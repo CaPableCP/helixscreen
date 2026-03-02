@@ -8,6 +8,7 @@
 #include "app_globals.h"
 #include "helix_version.h"
 #include "led/led_controller.h"
+#include "macro_param_cache.h"
 #include "moonraker_client.h"
 #include "printer_state.h"
 
@@ -26,6 +27,7 @@ void MoonrakerDiscoverySequence::clear_cache() {
     afc_objects_.clear();
     filament_sensors_.clear();
     hardware_ = PrinterDiscovery{};
+    MacroParamCache::instance().clear();
 }
 
 bool MoonrakerDiscoverySequence::is_stale() const {
@@ -351,6 +353,8 @@ void MoonrakerDiscoverySequence::continue_discovery_objects() {
                                 const auto& cfg =
                                     config_response["result"]["status"]["configfile"]["config"];
                                 hardware_.parse_config_keys(cfg);
+                                MacroParamCache::instance().populate_from_configfile(
+                                    cfg, hardware_.macros());
 
                                 // Update LED controller with configfile data (effect targets +
                                 // output_pin PWM)

@@ -20,6 +20,8 @@
 #include "ui_modal.h"
 #include "ui_update_queue.h"
 
+#include "macro_param_cache.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -170,7 +172,7 @@ void MacrosPanel::populate_macro_list() {
     MoonrakerAPI* api = get_moonraker_api();
     if (!api) {
         spdlog::warn("[{}] No MoonrakerAPI available", get_name());
-        std::snprintf(status_buf_, sizeof(status_buf_), "Not connected to printer");
+        std::snprintf(status_buf_, sizeof(status_buf_), "%s", lv_tr("Not connected to printer"));
         lv_subject_copy_string(&status_subject_, status_buf_);
         return;
     }
@@ -202,7 +204,7 @@ void MacrosPanel::populate_macro_list() {
     if (has_macros) {
         status_buf_[0] = '\0'; // Clear status when macros are present
     } else {
-        std::snprintf(status_buf_, sizeof(status_buf_), "No macros found");
+        std::snprintf(status_buf_, sizeof(status_buf_), "%s", lv_tr("No macros found"));
     }
     lv_subject_copy_string(&status_subject_, status_buf_);
 
@@ -228,18 +230,9 @@ void MacrosPanel::create_macro_card(const std::string& macro_name) {
         return;
     }
 
-    // Check if dangerous macro - style differently
     bool is_dangerous = is_dangerous_macro(macro_name);
-    if (is_dangerous) {
-        // Add warning icon or change color
-        lv_obj_t* icon = lv_obj_find_by_name(card, "macro_icon");
-        if (icon) {
-            // Could change icon to alert-circle or similar
-            // For now, leave as-is - could enhance later
-        }
-    }
 
-    // Store entry info — card pointer used for lookup in click callback
+    // Store entry info -- card pointer used for lookup in click callback
     MacroEntry entry;
     entry.card = card;
     entry.name = macro_name;
@@ -265,24 +258,7 @@ bool MacrosPanel::is_dangerous_macro(const std::string& name) {
 }
 
 void MacrosPanel::execute_macro(const std::string& macro_name) {
-    MoonrakerAPI* api = get_moonraker_api();
-    if (!api) {
-        spdlog::warn("[{}] No MoonrakerAPI available - cannot execute macro", get_name());
-        return;
-    }
-
-    spdlog::info("[{}] Executing macro: {}", get_name(), macro_name);
-
-    // L072: capture copies only — callbacks fire from WebSocket thread
-    api->execute_gcode(
-        macro_name,
-        [macro_name]() {
-            spdlog::info("[MacrosPanel] Macro '{}' executed successfully", macro_name);
-        },
-        [macro_name](const MoonrakerError& err) {
-            spdlog::error("[MacrosPanel] Failed to execute macro '{}': {}", macro_name,
-                          err.message);
-        });
+    execute_with_params(macro_name, {});
 }
 
 void MacrosPanel::fetch_params_and_execute(const std::string& macro_name) {
@@ -329,96 +305,37 @@ void MacrosPanel::fetch_params_and_execute(const std::string& macro_name) {
 }
 
 void MacrosPanel::fetch_params_and_run(const std::string& macro_name) {
-    MoonrakerAPI* api = get_moonraker_api();
-    if (!api) {
-        spdlog::warn("[{}] No MoonrakerAPI available - cannot fetch params", get_name());
-        return;
+    auto cached = helix::MacroParamCache::instance().get(macro_name);
+
+    switch (cached.knowledge) {
+    case helix::MacroParamKnowledge::KNOWN_NO_PARAMS:
+        execute_macro(macro_name);
+        break;
+    case helix::MacroParamKnowledge::KNOWN_PARAMS: {
+        std::weak_ptr<bool> weak = alive_;
+        std::string name = macro_name;
+        param_modal_.show_for_macro(
+            lv_screen_active(), macro_name, cached.params,
+            [this, weak, name](const std::map<std::string, std::string>& values) {
+                if (weak.expired())
+                    return;
+                execute_with_params(name, values);
+            });
+        break;
     }
-
-    // Query macro template via configfile to detect parameters.
-    // Klipper returns null for gcode_macro objects' gcode field — the Jinja
-    // template is only available through configfile.config.
-    nlohmann::json params;
-    params["objects"] = nlohmann::json::object();
-    params["objects"]["configfile"] = nlohmann::json::array({"config"});
-
-    std::weak_ptr<bool> weak_alive = alive_;
-    std::string macro_copy = macro_name;
-
-    // configfile.config keys use lowercase macro names
-    std::string config_key = "gcode_macro " + macro_name;
-    std::transform(config_key.begin(), config_key.end(), config_key.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-
-    api->get_client().send_jsonrpc(
-        "printer.objects.query", params,
-        [this, weak_alive, macro_copy, config_key](nlohmann::json response) {
-            if (weak_alive.expired())
-                return;
-
-            std::string gcode_template;
-            try {
-                if (response.contains("result") && response["result"].contains("status") &&
-                    response["result"]["status"].contains("configfile") &&
-                    response["result"]["status"]["configfile"].contains("config")) {
-                    auto& config =
-                        response["result"]["status"]["configfile"]["config"];
-                    if (config.contains(config_key)) {
-                        if (config[config_key].contains("gcode")) {
-                            gcode_template =
-                                config[config_key]["gcode"].get<std::string>();
-                        } else {
-                            spdlog::warn("[{}] Config key '{}' has no 'gcode' "
-                                         "field (keys: {})",
-                                         get_name(), config_key,
-                                         config[config_key].dump());
-                        }
-                    } else {
-                        spdlog::warn("[{}] Config key '{}' not found in "
-                                     "configfile.config",
-                                     get_name(), config_key);
-                    }
-                } else {
-                    spdlog::warn("[{}] configfile.config not present in "
-                                 "response for {}",
-                                 get_name(), macro_copy);
-                }
-            } catch (const std::exception& e) {
-                spdlog::warn("[{}] Failed to parse template for {}: {}", get_name(), macro_copy,
-                             e.what());
-            }
-
-            spdlog::debug("[{}] Template for '{}' (key='{}'): {} chars",
-                          get_name(), macro_copy, config_key,
-                          gcode_template.size());
-
-            auto parsed = helix::parse_macro_params(gcode_template);
-
-            helix::ui::queue_update(
-                [this, weak_alive, parsed = std::move(parsed), macro_copy]() mutable {
-                    if (weak_alive.expired())
-                        return;
-
-                    if (parsed.empty()) {
-                        execute_macro(macro_copy);
-                    } else {
-                        std::weak_ptr<bool> weak = alive_;
-                        std::string name = macro_copy;
-                        param_modal_.show_for_macro(
-                            lv_screen_active(), macro_copy, parsed,
-                            [this, weak,
-                             name](const std::map<std::string, std::string>& values) {
-                                if (weak.expired())
-                                    return;
-                                execute_with_params(name, values);
-                            });
-                    }
-                });
-        },
-        [macro_copy](const MoonrakerError& err) {
-            spdlog::warn("[MacrosPanel] Failed to query template for {}: {}", macro_copy,
-                         err.message);
-        });
+    case helix::MacroParamKnowledge::UNKNOWN: {
+        std::weak_ptr<bool> weak = alive_;
+        std::string name = macro_name;
+        param_modal_.show_for_unknown_params(
+            lv_screen_active(), macro_name,
+            [this, weak, name](const std::map<std::string, std::string>& values) {
+                if (weak.expired())
+                    return;
+                execute_with_params(name, values);
+            });
+        break;
+    }
+    }
 }
 
 void MacrosPanel::execute_with_params(const std::string& macro_name,

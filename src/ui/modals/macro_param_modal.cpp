@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "macro_param_modal.h"
+#include "macro_param_cache.h"
 
 #include "ui_event_safety.h"
+
+#include "lvgl/src/others/translation/lv_translation.h"
 
 #include <spdlog/spdlog.h>
 
@@ -86,14 +89,30 @@ void MacroParamModal::show_for_macro(lv_obj_t* parent, const std::string& macro_
     macro_name_ = macro_name;
     params_ = params;
     on_execute_ = std::move(on_execute);
+    raw_mode_ = false;
+    show_common(parent);
+}
+
+void MacroParamModal::show_for_unknown_params(lv_obj_t* parent, const std::string& macro_name,
+                                               MacroExecuteCallback on_execute) {
+    macro_name_ = macro_name;
+    params_.clear();
+    on_execute_ = std::move(on_execute);
+    raw_mode_ = true;
+    show_common(parent);
+}
+
+void MacroParamModal::show_common(lv_obj_t* parent) {
     textareas_.clear();
+    raw_textarea_ = nullptr;
 
     // Register callbacks before showing (idempotent)
     lv_xml_register_event_cb(nullptr, "macro_param_modal_run_cb", MacroParamModal::run_cb);
     lv_xml_register_event_cb(nullptr, "macro_param_modal_cancel_cb", MacroParamModal::cancel_cb);
 
     if (!show(parent)) {
-        spdlog::error("[MacroParamModal] Failed to show modal");
+        spdlog::error("[MacroParamModal] Failed to show modal{}", raw_mode_ ? " (raw mode)" : "");
+        raw_mode_ = false;
         return;
     }
 
@@ -112,16 +131,19 @@ void MacroParamModal::on_show() {
 
 void MacroParamModal::on_ok() {
     if (on_execute_) {
-        auto values = collect_values();
-        on_execute_(values);
+        on_execute_(collect_values());
     }
-    textareas_.clear(); // Clear before hide() — widgets are about to be deleted
-    s_active_instance_ = nullptr;
-    hide();
+    dismiss();
 }
 
 void MacroParamModal::on_cancel() {
-    textareas_.clear(); // Clear before hide() — widgets are about to be deleted
+    dismiss();
+}
+
+void MacroParamModal::dismiss() {
+    raw_mode_ = false;
+    raw_textarea_ = nullptr;
+    textareas_.clear(); // Clear before hide() -- widgets are about to be deleted
     s_active_instance_ = nullptr;
     hide();
 }
@@ -134,6 +156,19 @@ void MacroParamModal::populate_param_fields() {
     }
 
     textareas_.clear();
+
+    if (raw_mode_) {
+        const char* attrs[] = {"label",       lv_tr("Parameters"),
+                               "placeholder", lv_tr("e.g. NAME=my_var VALUE=123"),
+                               nullptr,       nullptr};
+        lv_obj_t* field =
+            static_cast<lv_obj_t*>(lv_xml_create(param_list, "form_field", attrs));
+        if (field) {
+            raw_textarea_ = lv_obj_find_by_name(field, "field_input");
+        }
+        spdlog::debug("[MacroParamModal] Created raw param field for {}", macro_name_);
+        return;
+    }
 
     for (const auto& param : params_) {
         // Prettify: lowercase with first letter capitalized
@@ -167,6 +202,14 @@ void MacroParamModal::populate_param_fields() {
 }
 
 std::map<std::string, std::string> MacroParamModal::collect_values() const {
+    if (raw_mode_ && raw_textarea_) {
+        const char* text = lv_textarea_get_text(raw_textarea_);
+        if (text && text[0] != '\0') {
+            return MacroParamCache::parse_raw_params(text);
+        }
+        return {};
+    }
+
     std::map<std::string, std::string> result;
 
     for (size_t i = 0; i < params_.size() && i < textareas_.size(); ++i) {

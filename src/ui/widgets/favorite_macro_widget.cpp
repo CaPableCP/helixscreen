@@ -13,7 +13,6 @@
 #include "app_globals.h"
 #include "device_display_name.h"
 #include "lvgl/src/others/translation/lv_translation.h"
-#include "macro_param_modal.h"
 #include "moonraker_api.h"
 #include "panel_widget_registry.h"
 #include "theme_manager.h"
@@ -69,8 +68,6 @@ FavoriteMacroWidget::~FavoriteMacroWidget() {
 void FavoriteMacroWidget::set_config(const nlohmann::json& config) {
     if (config.contains("macro") && config["macro"].is_string()) {
         macro_name_ = config["macro"].get<std::string>();
-        params_cached_ = false;
-        cached_params_.clear();
         spdlog::debug("[FavoriteMacroWidget] Config: {}={}", widget_id_, macro_name_);
     }
 }
@@ -196,114 +193,37 @@ void FavoriteMacroWidget::fetch_and_execute() {
         return;
     }
 
-    // If params are already cached, use them directly
-    if (params_cached_) {
-        if (cached_params_.empty()) {
-            // No params — execute directly
-            execute_with_params({});
-        } else if (parent_screen_) {
-            // Has params — show modal (guard against widget destruction while modal is open)
+    auto cached = MacroParamCache::instance().get(macro_name_);
+
+    switch (cached.knowledge) {
+    case MacroParamKnowledge::KNOWN_NO_PARAMS:
+        execute_with_params({});
+        break;
+    case MacroParamKnowledge::KNOWN_PARAMS:
+        if (parent_screen_) {
             std::weak_ptr<bool> weak_alive = alive_;
             get_shared_param_modal().show_for_macro(
-                parent_screen_, macro_name_, cached_params_,
+                parent_screen_, macro_name_, cached.params,
                 [this, weak_alive](const std::map<std::string, std::string>& values) {
                     if (weak_alive.expired())
                         return;
                     execute_with_params(values);
                 });
         }
-        return;
-    }
-
-    // Query macro template via configfile to detect parameters.
-    // Klipper returns null for gcode_macro objects' gcode field — the Jinja
-    // template is only available through configfile.config.
-    nlohmann::json params;
-    params["objects"] = nlohmann::json::object();
-    params["objects"]["configfile"] = nlohmann::json::array({"config"});
-
-    std::weak_ptr<bool> weak_alive = alive_;
-    std::string macro_name_copy = macro_name_;
-
-    // configfile.config keys use lowercase macro names
-    std::string config_key = "gcode_macro " + macro_name_copy;
-    std::transform(config_key.begin(), config_key.end(), config_key.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-
-    api->get_client().send_jsonrpc(
-        "printer.objects.query", params,
-        [this, weak_alive, macro_name_copy, config_key](nlohmann::json response) {
-            if (weak_alive.expired())
-                return;
-
-            std::string gcode_template;
-            try {
-                if (response.contains("result") && response["result"].contains("status") &&
-                    response["result"]["status"].contains("configfile") &&
-                    response["result"]["status"]["configfile"].contains("config")) {
-                    auto& config =
-                        response["result"]["status"]["configfile"]["config"];
-                    if (config.contains(config_key)) {
-                        if (config[config_key].contains("gcode")) {
-                            gcode_template =
-                                config[config_key]["gcode"].get<std::string>();
-                        } else {
-                            spdlog::warn("[FavoriteMacroWidget] Config key '{}' "
-                                         "has no 'gcode' field (keys: {})",
-                                         config_key,
-                                         config[config_key].dump());
-                        }
-                    } else {
-                        spdlog::warn("[FavoriteMacroWidget] Config key '{}' not "
-                                     "found in configfile.config",
-                                     config_key);
-                    }
-                } else {
-                    spdlog::warn("[FavoriteMacroWidget] configfile.config not "
-                                 "present in response for {}",
-                                 macro_name_copy);
-                }
-            } catch (const std::exception& e) {
-                spdlog::warn("[FavoriteMacroWidget] Failed to parse template for {}: {}",
-                             macro_name_copy, e.what());
-            }
-
-            spdlog::debug("[FavoriteMacroWidget] Template for '{}' (key='{}'): "
-                          "{} chars",
-                          macro_name_copy, config_key,
-                          gcode_template.size());
-
-            // Parse and cache params (on UI thread via queue)
-            auto parsed = parse_macro_params(gcode_template);
-            ui::queue_update(
-                [this, weak_alive, parsed = std::move(parsed), macro_name_copy]() mutable {
+        break;
+    case MacroParamKnowledge::UNKNOWN:
+        if (parent_screen_) {
+            std::weak_ptr<bool> weak_alive = alive_;
+            get_shared_param_modal().show_for_unknown_params(
+                parent_screen_, macro_name_,
+                [this, weak_alive](const std::map<std::string, std::string>& values) {
                     if (weak_alive.expired())
                         return;
-
-                    cached_params_ = std::move(parsed);
-                    params_cached_ = true;
-
-                    spdlog::debug("[FavoriteMacroWidget] Cached {} params for {}",
-                                  cached_params_.size(), macro_name_copy);
-
-                    if (cached_params_.empty()) {
-                        execute_with_params({});
-                    } else if (parent_screen_) {
-                        // Guard against widget destruction while modal is open
-                        get_shared_param_modal().show_for_macro(
-                            parent_screen_, macro_name_, cached_params_,
-                            [this, weak_alive](const std::map<std::string, std::string>& values) {
-                                if (weak_alive.expired())
-                                    return;
-                                execute_with_params(values);
-                            });
-                    }
+                    execute_with_params(values);
                 });
-        },
-        [macro_name_copy](const MoonrakerError& err) {
-            spdlog::warn("[FavoriteMacroWidget] Failed to query template for {}: {}",
-                         macro_name_copy, err.message);
-        });
+        }
+        break;
+    }
 }
 
 void FavoriteMacroWidget::execute_with_params(const std::map<std::string, std::string>& params) {
@@ -525,8 +445,6 @@ void FavoriteMacroWidget::dismiss_macro_picker() {
 
 void FavoriteMacroWidget::select_macro(const std::string& name) {
     macro_name_ = name;
-    params_cached_ = false; // Invalidate param cache for new macro
-    cached_params_.clear();
 
     update_display();
     save_config();
