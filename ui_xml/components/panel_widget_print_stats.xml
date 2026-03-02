@@ -15,7 +15,7 @@
             flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center"
             clickable="false" event_bubble="true">
       <text_small bind_text="print_stats_title"
-                  style_text_color="#text_secondary"
+                  style_text_color="#text_muted"
                   clickable="false" event_bubble="true"/>
     </lv_obj>
 
@@ -38,7 +38,7 @@
       <bind_flag_if_not_eq subject="print_stats_size_mode" flag="hidden" ref_value="3"/>
       <text_body bind_text="print_stats_total_prints" clickable="false" event_bubble="true"/>
       <text_tiny text="prints" translation_tag="prints"
-                 style_text_color="#text_secondary" clickable="false" event_bubble="true"/>
+                 style_text_color="#text_muted" clickable="false" event_bubble="true"/>
       <text_tiny text="·" style_text_color="#text_muted" clickable="false" event_bubble="true"/>
       <text_body bind_text="print_stats_total_time_short" clickable="false" event_bubble="true"/>
       <text_tiny text="·" style_text_color="#text_muted" clickable="false" event_bubble="true"/>
@@ -65,7 +65,7 @@
           <text_body bind_text="print_stats_total_time_short" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
           <text_tiny text="Time" translation_tag="Time"
-                     style_text_color="#text_secondary" style_text_align="center" width="100%"
+                     style_text_color="#text_muted" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
         </lv_obj>
         <!-- Success -->
@@ -75,7 +75,7 @@
           <text_body bind_text="print_stats_success_rate" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
           <text_tiny text="Success" translation_tag="Success"
-                     style_text_color="#text_secondary" style_text_align="center" width="100%"
+                     style_text_color="#text_muted" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
         </lv_obj>
       </lv_obj>
@@ -86,7 +86,7 @@
               clickable="false" event_bubble="true">
         <text_body bind_text="print_stats_total_prints" clickable="false" event_bubble="true"/>
         <text_tiny text="prints" translation_tag="prints"
-                   style_text_color="#text_secondary" clickable="false" event_bubble="true"/>
+                   style_text_color="#text_muted" clickable="false" event_bubble="true"/>
         <text_tiny text="·" style_text_color="#text_muted" clickable="false" event_bubble="true"/>
         <text_body bind_text="print_stats_total_time_short" clickable="false" event_bubble="true"/>
         <text_tiny text="·" style_text_color="#text_muted" clickable="false" event_bubble="true"/>
@@ -114,7 +114,7 @@
           <text_body bind_text="print_stats_total_prints" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
           <text_tiny text="Prints" translation_tag="Prints"
-                     style_text_color="#text_secondary" style_text_align="center" width="100%"
+                     style_text_color="#text_muted" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
         </lv_obj>
 
@@ -125,7 +125,7 @@
           <text_body bind_text="print_stats_total_time" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
           <text_tiny text="Time" translation_tag="Time"
-                     style_text_color="#text_secondary" style_text_align="center" width="100%"
+                     style_text_color="#text_muted" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
         </lv_obj>
 
@@ -136,7 +136,7 @@
           <text_body bind_text="print_stats_success_rate" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
           <text_tiny text="Success" translation_tag="Success"
-                     style_text_color="#text_secondary" style_text_align="center" width="100%"
+                     style_text_color="#text_muted" style_text_align="center" width="100%"
                      clickable="false" event_bubble="true"/>
         </lv_obj>
       </lv_obj>
@@ -146,10 +146,10 @@
               style_bg_opa="0%" style_pad_all="0" style_pad_gap="#space_xs"
               flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center"
               clickable="false" event_bubble="true">
-        <text_body bind_text="print_stats_weekly" style_text_color="#text_secondary"
+        <text_body bind_text="print_stats_weekly" style_text_color="#text_muted"
                    clickable="false" event_bubble="true"/>
         <text_tiny text="·" style_text_color="#text_muted" clickable="false" event_bubble="true"/>
-        <text_body bind_text="print_stats_last_print" style_text_color="#text_secondary"
+        <text_body bind_text="print_stats_last_print" style_text_color="#text_muted"
                    clickable="false" event_bubble="true"/>
       </lv_obj>
     </lv_obj>

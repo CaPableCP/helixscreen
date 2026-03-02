@@ -1,7 +1,7 @@
 <component>
   <view name="panel_widget_camera" width="100%" height="100%"
         style_bg_color="#card_bg" style_bg_opa="cover" clip_corner="true"
-        style_radius="#radius_md">
+        style_radius="#border_radius">
     <lv_image name="camera_image" width="100%" height="100%"
               style_image_recolor="#000000" style_image_recolor_opa="0"/>
     <lv_obj name="camera_overlay" align="center"

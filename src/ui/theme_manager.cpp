@@ -993,12 +993,10 @@ static void theme_manager_register_theme_properties(lv_xml_component_scope_t* sc
                                                     const helix::ThemeData& theme) {
     char buf[32];
 
-    // Register button_radius and card_radius - theme-specific corner radii
-    // Separate from border_radius which controls general UI elements like dropdowns/inputs
-    // Both currently use the same theme value, but may be split later
+    // Register border_radius and button_radius as XML constants from theme
     snprintf(buf, sizeof(buf), "%d", theme.properties.border_radius);
+    lv_xml_register_const(scope, "border_radius", buf);
     lv_xml_register_const(scope, "button_radius", buf);
-    lv_xml_register_const(scope, "card_radius", buf);
 
     // Register border_width
     snprintf(buf, sizeof(buf), "%d", theme.properties.border_width);
