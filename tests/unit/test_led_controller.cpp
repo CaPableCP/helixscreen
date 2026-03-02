@@ -239,7 +239,7 @@ TEST_CASE("LedController: toggle_all with empty selected_strips is a no-op", "[l
     // Clear any auto-selected strips persisted by prior tests
     auto* cfg = Config::get_instance();
     if (cfg) {
-        cfg->set("/printer/leds/selected_strips", nlohmann::json::array());
+        cfg->set(cfg->df() + "leds/selected_strips", nlohmann::json::array());
         cfg->save();
     }
 
@@ -379,7 +379,7 @@ TEST_CASE("LedController: apply_startup_preference with no strips is a no-op",
     // Clear any auto-selected strips persisted by prior tests
     auto* cfg = Config::get_instance();
     if (cfg) {
-        cfg->set("/printer/leds/selected_strips", nlohmann::json::array());
+        cfg->set(cfg->df() + "leds/selected_strips", nlohmann::json::array());
         cfg->save();
     }
 
