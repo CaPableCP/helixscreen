@@ -388,12 +388,30 @@ lv_indev_t* DisplayBackendFbdev::create_input_pointer() {
 
             // MT-only devices (e.g., Goodix gt9xxnew_ts) don't have legacy ABS_X/ABS_Y.
             // Fall back to ABS_MT_POSITION_X/ABS_MT_POSITION_Y for range queries.
-            if ((!got_x || !got_y) && abs_caps.has_multitouch) {
-                spdlog::info("[Fbdev Backend] ABS_X/ABS_Y not available, falling back to MT axes");
+            // Also fall back when EVIOCGABS succeeds but returns zero range — some
+            // MT-only controllers report ABS_X with all-zero data (not an error).
+            bool used_mt_fallback = false;
+            bool range_is_zero =
+                got_x && got_y && abs_x.maximum == 0 && abs_y.maximum == 0;
+            if (abs_caps.has_multitouch && (!got_x || !got_y || range_is_zero)) {
+                used_mt_fallback = true;
+                spdlog::info(
+                    "[Fbdev Backend] ABS_X/ABS_Y not available or zero-range, falling back to MT axes");
                 got_x = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &abs_x) == 0);
                 got_y = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &abs_y) == 0);
             }
             close(fd);
+
+            // When MT fallback provided valid ranges, propagate them into LVGL's
+            // internal calibration so coordinate mapping works correctly even when
+            // the driver's EVIOCGABS(ABS_X) returned zeros.
+            if (used_mt_fallback && got_x && got_y && abs_x.maximum > abs_x.minimum) {
+                lv_evdev_set_calibration(touch_, abs_x.minimum, abs_y.minimum, abs_x.maximum,
+                                         abs_y.maximum);
+                spdlog::info(
+                    "[Fbdev Backend] Applied MT axis range to LVGL calibration: X({}..{}) Y({}..{})",
+                    abs_x.minimum, abs_x.maximum, abs_y.minimum, abs_y.maximum);
+            }
 
             if (got_x && got_y) {
                 spdlog::info(
