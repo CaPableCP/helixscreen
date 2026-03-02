@@ -2349,6 +2349,14 @@ void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
     if (active_ && container_) {
         create_dots_overlay();
     }
+
+    // Select the newly added widget so its chrome is visible immediately
+    if (active_ && container_) {
+        lv_obj_t* new_widget = lv_obj_find_by_name(container_, widget_id.c_str());
+        if (new_widget) {
+            select_widget(new_widget);
+        }
+    }
 }
 
 } // namespace helix
