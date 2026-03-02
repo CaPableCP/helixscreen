@@ -4,7 +4,7 @@
 
 #include "lvgl.h"
 
-#if LV_USE_LIBJPEG_TURBO
+#if HELIX_HAS_CAMERA
 
 #include "app_globals.h"
 #include "moonraker_api.h"
@@ -235,4 +235,4 @@ void CameraWidget::set_status_text(const char* text) {
 
 } // namespace helix
 
-#endif // LV_USE_LIBJPEG_TURBO
+#endif // HELIX_HAS_CAMERA

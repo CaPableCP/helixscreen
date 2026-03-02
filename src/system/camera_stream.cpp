@@ -4,7 +4,7 @@
 
 #include "lvgl.h"
 
-#if LV_USE_LIBJPEG_TURBO
+#if HELIX_HAS_CAMERA
 
 #include "hv/requests.h"
 #include "spdlog/spdlog.h"
@@ -424,4 +424,4 @@ void CameraStream::free_buffers() {
 
 } // namespace helix
 
-#endif // LV_USE_LIBJPEG_TURBO
+#endif // HELIX_HAS_CAMERA

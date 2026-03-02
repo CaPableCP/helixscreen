@@ -3,9 +3,8 @@
 
 #include "lvgl.h"
 
-// LV_USE_LIBJPEG_TURBO is used as a platform gate — camera features are only
-// available on Pi/desktop platforms. Actual JPEG decoding uses stb_image.
-#if LV_USE_LIBJPEG_TURBO
+// Camera features available on Pi/desktop. JPEG decoding uses stb_image.
+#if HELIX_HAS_CAMERA
 
 #include <atomic>
 #include <functional>
@@ -91,4 +90,4 @@ class CameraStream {
 
 } // namespace helix
 
-#endif // LV_USE_LIBJPEG_TURBO
+#endif // HELIX_HAS_CAMERA

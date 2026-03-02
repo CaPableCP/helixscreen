@@ -3,7 +3,7 @@
 
 #include "lvgl.h"
 
-#if LV_USE_LIBJPEG_TURBO
+#if HELIX_HAS_CAMERA
 
 #include "camera_stream.h"
 #include "panel_widget.h"
@@ -41,4 +41,4 @@ class CameraWidget : public PanelWidget {
 
 } // namespace helix
 
-#endif // LV_USE_LIBJPEG_TURBO
+#endif // HELIX_HAS_CAMERA
