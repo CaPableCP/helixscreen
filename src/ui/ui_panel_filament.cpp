@@ -818,8 +818,21 @@ void FilamentPanel::handle_purge_button() {
         spdlog::info("[{}] Using StandardMacros purge: {}", get_name(), info.get_macro());
         NOTIFY_INFO("Purging nozzle...");
 
+        // Auto-pass PURGE_TEMP from active material if available
+        std::map<std::string, std::string> params;
+        auto active = helix::get_active_material();
+        if (active) {
+            int recommended = active->material_info.nozzle_recommended();
+            if (recommended > 0) {
+                params["PURGE_TEMP"] = std::to_string(recommended);
+                spdlog::info("[{}] Passing PURGE_TEMP={} from active material: {}", get_name(),
+                             recommended, active->display_name);
+            }
+        }
+
         StandardMacros::instance().execute(
-            StandardMacroSlot::Purge, api_, []() { NOTIFY_SUCCESS("Purge complete"); },
+            StandardMacroSlot::Purge, api_, params,
+            []() { NOTIFY_SUCCESS("Purge complete"); },
             [](const MoonrakerError& error) {
                 NOTIFY_ERROR("Purge failed: {}", error.user_message());
             });
