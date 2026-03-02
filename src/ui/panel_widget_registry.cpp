@@ -33,6 +33,7 @@ void register_clock_widget();
 void register_job_queue_widget();
 void register_clog_detection_widget();
 void register_print_stats_widget();
+void register_gcode_console_widget();
 #if HELIX_HAS_CAMERA
 void register_camera_widget();
 #endif
@@ -66,6 +67,7 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     {"tips",             "Tips",              "help_circle",      "Rotating tips and helpful information",        "Tips",             nullptr,              true,  4, 2, 2, 1, 6, 2},
     {"clog_detection",   "Clog Detection",    "water",            "Filament clog/flow detection meter",           "Clog Detection",   "clog_meter_mode",    true,  1, 1, 1, 1, 2, 2},
     {"print_stats",      "Print Stats",       "printer_3d",       "Print history statistics",                     "Print Stats",      nullptr,              false, 2, 2, 2, 1, 3, 2},
+    {"gcode_console",    "GCode Console",     "console",          "Open G-code command console",                  "GCode Console",    nullptr,              false, 1, 1, 1, 1, 1, 1},
 #if HELIX_HAS_CAMERA
     {"camera",           "Camera",            "video",            "Live webcam feed",                             "Camera",           nullptr,              false, 2, 2, 1, 1, 4, 3},
 #endif
@@ -163,6 +165,7 @@ void init_widget_registrations() {
     register_shutdown_widget();
     register_clog_detection_widget();
     register_print_stats_widget();
+    register_gcode_console_widget();
 #if HELIX_HAS_CAMERA
     register_camera_widget();
 #endif
