@@ -931,7 +931,17 @@ void Application::run_rotation_probe_and_layout() {
                 m_config->set("/display/rotation_probed", true);
                 m_config->save();
             } else {
-                // kernel_orientation == -1: not detected, run interactive probe
+                // kernel_orientation == -1: not detected, run interactive probe.
+                // Dismiss splash first — the probe renders full-screen UI to the
+                // framebuffer, which is invisible while the splash process is
+                // painting over it and the flush callback is suppressed.
+                if (!m_splash_manager.has_exited()) {
+                    spdlog::info("[Application] Dismissing splash for rotation probe");
+                    m_splash_manager.on_discovery_complete();
+                    m_splash_manager.check_and_signal();
+                    restore_flush_callback();
+                    lv_display_enable_invalidation(nullptr, true);
+                }
                 m_display->run_rotation_probe();
                 m_screen_width = m_display->width();
                 m_screen_height = m_display->height();
