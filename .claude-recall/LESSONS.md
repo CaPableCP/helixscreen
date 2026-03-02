@@ -8,8 +8,8 @@
 
 ## Active Lessons
 
-### [L008] [**---|****-] Design tokens and semantic widgets
-- **Uses**: 9 | **Velocity**: 2 | **Learned**: 2025-12-14 | **Last**: 2026-03-01 | **Category**: pattern | **Type**: informational
+### [L008] [***--|*****] Design tokens and semantic widgets
+- **Uses**: 11 | **Velocity**: 4 | **Learned**: 2025-12-14 | **Last**: 2026-03-02 | **Category**: pattern | **Type**: informational
 > No hardcoded colors or spacing. Prefer semantic widgets (ui_card, ui_button, text_*, divider_*) which apply tokens automatically. Don't redundantly specify their built-in defaults (e.g., style_radius on ui_card, button_height on ui_button). See docs/LVGL9_XML_GUIDE.md "Custom Semantic Widgets" for defaults.
 
 ### [L009] [***--|*****] Icon font sync workflow
@@ -32,12 +32,12 @@
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2025-12-14 | **Last**: 2025-12-31 | **Category**: pattern | **Type**: informational
 > Use centidegrees (int) for temperature subjects to preserve 0.1C resolution. Float subjects lose precision in LVGL binding
 
-### [L025] [**---|-----] Button content centering
-- **Uses**: 8 | **Velocity**: 0 | **Learned**: 2025-12-21 | **Last**: 2026-01-30 | **Category**: pattern | **Type**: constraint
+### [L025] [**---|***--] Button content centering
+- **Uses**: 9 | **Velocity**: 1 | **Learned**: 2025-12-21 | **Last**: 2026-03-02 | **Category**: pattern | **Type**: constraint
 > Text-only buttons: use `align="center"` on child. Icon+text buttons with flex_flow="row": need ALL THREE flex properties - style_flex_main_place="center" (horizontal), style_flex_cross_place="center" (vertical align items), style_flex_track_place="center" (vertical position of row). Missing track_place causes content to sit at top.
 
 ### [L031] [****-|*****] XML no recompile
-- **Uses**: 86 | **Velocity**: 66.0075 | **Learned**: 2025-12-27 | **Last**: 2026-03-02 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 99 | **Velocity**: 79.0075 | **Learned**: 2025-12-27 | **Last**: 2026-03-02 | **Category**: gotcha | **Type**: constraint
 > XML files are loaded at RUNTIME - never rebuild after XML-only changes. Just relaunch the app. This includes layout changes, styling, bindings, event callbacks - anything in ui_xml/*.xml. Only rebuild when C++ code changes.
 
 ### [L039] [*----|***--] Unique XML callback names
@@ -81,7 +81,7 @@
 > Singleton queues (like UpdateQueue) MUST clear pending callbacks in shutdown(), not just null the timer. Without clearing, stale callbacks remain queued and execute on next init() with pointers to destroyed objects → use-after-free. Pattern: std::queue<T>().swap(pending_) to clear, then null timer.
 
 ### [L055] [**---|*****] LVGL pad_all excludes flex gaps
-- **Uses**: 6 | **Velocity**: 5 | **Learned**: 2026-01-10 | **Last**: 2026-03-01 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 7 | **Velocity**: 6 | **Learned**: 2026-01-10 | **Last**: 2026-03-02 | **Category**: gotcha | **Type**: constraint
 > `style_pad_all` only sets edge padding (top/bottom/left/right), NOT inter-item spacing. For zero-gap flex layouts, also need `style_pad_row="0"` (column) or `style_pad_column="0"` (row), or `style_pad_gap="0"` for both.
 
 ### [L056] [*----|-----] lv_subject_t no shallow copy
@@ -97,7 +97,7 @@
 > Always use lv_obj_safe_delete() instead of raw lv_obj_delete() - it guards against shutdown race conditions by checking lv_is_initialized() and lv_display_get_next() before deletion, and auto-nulls the pointer to prevent use-after-free
 
 ### [L060] [****-|*****] Interactive UI testing requires user
-- **Uses**: 51 | **Velocity**: 50.01 | **Learned**: 2026-02-01 | **Last**: 2026-03-02 | **Category**: correction | **Type**: constraint
+- **Uses**: 54 | **Velocity**: 53.01 | **Learned**: 2026-02-01 | **Last**: 2026-03-02 | **Category**: correction | **Type**: constraint
 > NEVER use timed delays expecting automatic navigation. THE EXACT PATTERN THAT WORKS:
 > **Step 1** - Start app with Bash tool using `run_in_background: true`:
 > ```bash
@@ -117,8 +117,8 @@
 - **Uses**: 5 | **Velocity**: 5 | **Learned**: 2026-02-07 | **Last**: 2026-02-25 | **Category**: build
 > AD5M cross-compilation uses 'make ad5m-docker' (Docker-based ARM cross-compile), NOT 'make pi-test' (which targets Raspberry Pi). Deploy with 'AD5M_HOST=192.168.1.67 make ad5m-deploy'. The pi-test target is for a different device entirely.
 
-### [L064] [*----|*****] Commit generated translation artifacts
-- **Uses**: 4 | **Velocity**: 4 | **Learned**: 2026-02-10 | **Last**: 2026-03-01 | **Category**: i18n
+### [L064] [**---|*****] Commit generated translation artifacts
+- **Uses**: 5 | **Velocity**: 5 | **Learned**: 2026-02-10 | **Last**: 2026-03-02 | **Category**: i18n
 > After syncing translation YAML files, must also regenerate and commit the compiled artifacts: src/generated/lv_i18n_translations.c, src/generated/lv_i18n_translations.h, and ui_xml/translations/translations.xml. These are tracked in git (not gitignored) for cross-compilation support. The build regenerates them automatically, but they won't be staged unless you explicitly add them.
 
 ### [L065] [-----|-----] No test-only methods on production classes
