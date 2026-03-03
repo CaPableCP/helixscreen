@@ -8,6 +8,7 @@
 #include "ui_callback_helpers.h"
 #include "ui_event_safety.h"
 #include "ui_icon_codepoints.h"
+#include "ui_update_queue.h"
 
 #include <spdlog/spdlog.h>
 
@@ -140,8 +141,7 @@ void PrinterSwitchMenu::populate_printer_list() {
         lv_obj_add_flag(label, LV_OBJ_FLAG_EVENT_BUBBLE);
 
         // Store printer ID for click handler
-        auto* id_copy = new std::string(id);
-        lv_obj_set_user_data(row, id_copy);
+        lv_obj_set_name(row, id.c_str());
 
         lv_obj_add_event_cb(row, on_printer_row_cb, LV_EVENT_CLICKED, nullptr);
     }
@@ -166,37 +166,20 @@ void PrinterSwitchMenu::handle_add_printer() {
 
 void PrinterSwitchMenu::dispatch_switch_action(MenuAction action,
                                                 const std::string& printer_id) {
-    // Clean up heap-allocated strings before hiding
-    cleanup_row_user_data();
-
-    // Capture callback before hide() clears state
     auto callback = switch_callback_;
-
     s_active_instance_ = nullptr;
-    hide();
 
-    if (callback) {
-        callback(action, printer_id);
-    }
+    // Defer hide + callback — we're inside a click event on a child of menu_obj_
+    helix::ui::queue_update([this, callback, action, printer_id]() {
+        hide();
+        if (callback) {
+            callback(action, printer_id);
+        }
+    });
 }
 
 void PrinterSwitchMenu::cleanup_row_user_data() {
-    if (!menu()) {
-        return;
-    }
-
-    lv_obj_t* printer_list = lv_obj_find_by_name(menu(), "printer_list");
-    if (!printer_list) {
-        return;
-    }
-
-    uint32_t count = lv_obj_get_child_count(printer_list);
-    for (uint32_t i = 0; i < count; ++i) {
-        lv_obj_t* row = lv_obj_get_child(printer_list, i);
-        auto* id_ptr = static_cast<std::string*>(lv_obj_get_user_data(row));
-        delete id_ptr;
-        lv_obj_set_user_data(row, nullptr);
-    }
+    // No-op: row IDs are stored via lv_obj_set_name(), no heap cleanup needed.
 }
 
 // ============================================================================
@@ -250,25 +233,25 @@ void PrinterSwitchMenu::on_printer_row_cb(lv_event_t* e) {
         return;
     }
 
-    // Walk up parent chain to find the row with user_data
+    // Walk up parent chain to find the row with a name (printer ID)
     // (click target may be a child label due to event bubbling)
     auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    std::string* id_ptr = nullptr;
+    const char* name = nullptr;
     lv_obj_t* obj = target;
     while (obj) {
-        id_ptr = static_cast<std::string*>(lv_obj_get_user_data(obj));
-        if (id_ptr) {
+        name = lv_obj_get_name(obj);
+        if (name && name[0] != '\0') {
             break;
         }
         obj = lv_obj_get_parent(obj);
     }
 
-    if (!id_ptr) {
+    if (!name || name[0] == '\0') {
         spdlog::warn("[PrinterSwitchMenu] Row click with no printer ID");
         return;
     }
 
-    std::string selected_id = *id_ptr;
+    std::string selected_id(name);
     self->handle_printer_selected(selected_id);
 
     LVGL_SAFE_EVENT_CB_END();

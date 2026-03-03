@@ -1040,6 +1040,27 @@ void KeyboardManager::set_mode(lv_keyboard_mode_t mode) {
     lv_keyboard_set_mode(keyboard_, mode);
 }
 
+void KeyboardManager::reset() {
+    spdlog::debug("[KeyboardManager] Resetting state for soft restart");
+
+    // Widget pointers are dangling — the LVGL widget tree has been destroyed.
+    // Do NOT call lv_obj_del or any LVGL API on these pointers.
+    keyboard_ = nullptr;
+    context_textarea_ = nullptr;
+    overlay_ = nullptr;
+
+    // Reset all state so init() can be called again
+    longpress_state_ = LP_IDLE;
+    pressed_btn_id_ = 0;
+    pressed_char_ = 0;
+    alternatives_ = nullptr;
+    mode_ = MODE_ALPHA_LC;
+    shift_just_pressed_ = false;
+    one_shot_shift_ = false;
+    caps_lock_ = false;
+    initialized_ = false;
+}
+
 void KeyboardManager::set_position(lv_align_t align, int32_t x_ofs, int32_t y_ofs) {
     if (keyboard_ == nullptr) {
         spdlog::error("[KeyboardManager] Not initialized - call init() first");

@@ -18,6 +18,11 @@
 
 namespace helix {
 namespace wizard {
+
+// ---- Per-printer settings (suffixes — prepend config->df() for full path) ----
+// Example: config->get<T>(config->df() + wizard::BED_HEATER, default_val)
+//          resolves to e.g. "/printers/voron/heaters/bed"
+
 // Printer identification
 constexpr const char* PRINTER_NAME = "printer_name";
 constexpr const char* PRINTER_TYPE = "type";
@@ -41,14 +46,16 @@ constexpr const char* EXHAUST_FAN = "fans/exhaust";
 constexpr const char* LED_STRIP = "leds/strip";
 constexpr const char* LED_SELECTED = "leds/selected";
 
-// Network configuration
+// Network configuration (per-printer)
 constexpr const char* MOONRAKER_HOST = "moonraker_host";
 constexpr const char* MOONRAKER_PORT = "moonraker_port";
+
+// ---- Device-level settings (absolute paths — do NOT prepend df()) ----
 constexpr const char* WIFI_SSID = "/wifi/ssid";
 constexpr const char* WIFI_PASSWORD = "/wifi/password";
 } // namespace wizard
 
-// Display settings
-constexpr const char* PRINTER_IMAGE = "/display/printer_image";
+// Per-printer setting (suffix — prepend config->df() for full path)
+constexpr const char* PRINTER_IMAGE = "printer_image";
 
 } // namespace helix

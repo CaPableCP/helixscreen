@@ -320,7 +320,7 @@ void PrinterManagerOverlay::start_name_edit() {
     // Pre-fill input with current name
     lv_textarea_set_text(name_input_, name_buf_);
 
-    // Swap visibility: hide heading, show input
+    // TODO: Replace imperative visibility toggling with subject + bind_flag_if_eq
     lv_obj_add_flag(name_heading_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(name_input_, LV_OBJ_FLAG_HIDDEN);
 

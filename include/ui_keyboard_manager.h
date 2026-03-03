@@ -100,6 +100,18 @@ class KeyboardManager {
      */
     void set_position(lv_align_t align, int32_t x_ofs, int32_t y_ofs);
 
+    /**
+     * @brief Reset keyboard state for soft restart
+     *
+     * Clears all widget pointers (keyboard_, context_textarea_, overlay_) that
+     * become dangling when the LVGL widget tree is destroyed. Resets initialized_
+     * so init() can be called again. Does NOT delete widgets — caller must ensure
+     * the widget tree has already been torn down.
+     *
+     * Call from Application::tear_down_printer_state() before rebuilding UI.
+     */
+    void reset();
+
   private:
     // Private constructor for singleton
     KeyboardManager() = default;

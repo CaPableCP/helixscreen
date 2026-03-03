@@ -579,14 +579,14 @@ std::string DisplaySettingsManager::get_printer_image() const {
     Config* config = Config::get_instance();
     if (!config)
         return "";
-    return config->get<std::string>("/display/printer_image", "");
+    return config->get<std::string>(config->df() + "printer_image", "");
 }
 
 void DisplaySettingsManager::set_printer_image(const std::string& id) {
     Config* config = Config::get_instance();
     if (!config)
         return;
-    config->set<std::string>("/display/printer_image", id);
+    config->set<std::string>(config->df() + "printer_image", id);
     config->save();
     spdlog::info("[DisplaySettingsManager] Printer image set to: '{}'",
                  id.empty() ? "(auto-detect)" : id);

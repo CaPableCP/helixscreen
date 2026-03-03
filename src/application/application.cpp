@@ -48,6 +48,7 @@
 #include "ui_crash_report_modal.h"
 #include "ui_dialog.h"
 #include "ui_emergency_stop.h"
+#include "ui_modal.h"
 #include "ui_error_reporting.h"
 #include "ui_fan_control_overlay.h"
 #include "ui_gcode_viewer.h"
@@ -2567,6 +2568,12 @@ void Application::check_timeouts() {
 // ============================================================================
 
 void Application::switch_printer(const std::string& printer_id) {
+    if (m_soft_restart_in_progress) {
+        spdlog::warn("[Application] Ignoring switch_printer during active soft restart");
+        return;
+    }
+    m_soft_restart_in_progress = true;
+
     spdlog::info("[Application] Switching to printer '{}'...", printer_id);
 
     // Validate printer exists in config
@@ -2588,10 +2595,17 @@ void Application::switch_printer(const std::string& printer_id) {
     std::string toast_msg = "Connected to " + printer_name;
     ToastManager::instance().show(ToastSeverity::INFO, toast_msg.c_str());
 
+    m_soft_restart_in_progress = false;
     spdlog::info("[Application] Switched to printer '{}'", printer_id);
 }
 
 void Application::add_printer_via_wizard() {
+    if (m_soft_restart_in_progress) {
+        spdlog::warn("[Application] Ignoring add_printer_via_wizard during active soft restart");
+        return;
+    }
+    m_soft_restart_in_progress = true;
+
     // Generate a unique ID for the new printer entry (loop to avoid collisions after deletes)
     auto existing_ids = m_config->get_printer_ids();
     int counter = static_cast<int>(existing_ids.size()) + 1;
@@ -2626,9 +2640,16 @@ void Application::add_printer_via_wizard() {
     });
 
     init_printer_state();
+
+    m_soft_restart_in_progress = false;
 }
 
 void Application::cancel_add_printer_wizard() {
+    if (m_soft_restart_in_progress) {
+        spdlog::warn("[Application] Ignoring cancel_add_printer_wizard during active soft restart");
+        return;
+    }
+
     if (m_wizard_previous_printer_id.empty()) {
         spdlog::debug("[Application] No add-printer recovery state — ignoring cancel");
         return;
@@ -2647,12 +2668,16 @@ void Application::cancel_add_printer_wizard() {
     // Defer wizard teardown + soft restart — we're called from a wizard button click handler,
     // so the wizard_container must survive until the event callback returns.
     helix::ui::queue_update([this]() {
+        m_soft_restart_in_progress = true;
+
         set_wizard_active(false);
         ui_wizard_deinit_subjects();
 
         tear_down_printer_state();
         init_printer_state();
         NavigationManager::instance().set_active(PanelId::Home);
+
+        m_soft_restart_in_progress = false;
     });
 }
 
@@ -2687,7 +2712,10 @@ void Application::tear_down_printer_state() {
         m_plugin_manager.reset();
     }
 
-    // 5. Disconnect WebSocket thread to stop background callbacks
+    // 5. Freeze update queue to prevent new callbacks during teardown
+    auto queue_freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
+
+    // 5b. Disconnect WebSocket thread to stop background callbacks
     if (m_moonraker && m_moonraker->client()) {
         m_moonraker->client()->disconnect();
     }
@@ -2696,6 +2724,10 @@ void Application::tear_down_printer_state() {
     //    Must happen AFTER disconnect (no more producers) and BEFORE destroying
     //    objects referenced by queued callbacks.
     helix::ui::update_queue_shutdown();
+
+    // 6b. Release JobQueueState (holds API/client pointers and subjects)
+    set_job_queue_state(nullptr);
+    m_job_queue_state.reset();
 
     // 7. Release history managers
     m_history_manager.reset();
@@ -2730,6 +2762,9 @@ void Application::tear_down_printer_state() {
     // 13. Kill all LVGL animations (hold widget pointers)
     lv_anim_delete_all();
 
+    // 13b. Clear ModalStack tracking (widgets destroyed by lv_obj_del below)
+    ModalStack::instance().clear();
+
     // 14. Destroy all static panel/overlay globals (releases ObserverGuards).
     //     Subjects are still alive here, so lv_observer_remove() works correctly.
     StaticPanelRegistry::instance().destroy_all();
@@ -2751,7 +2786,10 @@ void Application::tear_down_printer_state() {
     // 18. Release MoonrakerManager
     m_moonraker.reset();
 
-    // 19. Delete LVGL widget tree (panels already released references)
+    // 19. Reset KeyboardManager (widget pointers become dangling after tree delete)
+    KeyboardManager::instance().reset();
+
+    // 20. Delete LVGL widget tree (panels already released references)
     //     DO NOT call lv_deinit() — display stays alive
     if (m_app_layout) {
         lv_obj_del(m_app_layout);
@@ -2764,6 +2802,17 @@ void Application::tear_down_printer_state() {
 
 void Application::init_printer_state() {
     spdlog::info("[Application] Initializing printer state...");
+
+    // Show error on screen so user isn't left with blank display after init failure.
+    // Exceptional error path — imperative LVGL is acceptable here.
+    auto show_init_error = [this]() {
+        lv_obj_t* err_label = lv_label_create(m_screen);
+        lv_label_set_text(err_label,
+                          "Printer initialization failed.\nPlease restart the application.");
+        lv_obj_center(err_label);
+        lv_obj_set_style_text_color(err_label, lv_color_hex(0xFF4444), 0);
+        lv_obj_set_style_text_font(err_label, lv_font_get_default(), 0);
+    };
 
     // NOTE: ObserverGuard::invalidate_all() was called at the end of teardown.
     // Guards in surviving singletons hold freed observer pointers. When they get
@@ -2778,6 +2827,7 @@ void Application::init_printer_state() {
     // 2. Initialize core subjects (PrinterState, AmsState, etc.)
     if (!init_core_subjects()) {
         spdlog::error("[Application] Failed to reinitialize core subjects");
+        show_init_error();
         ObserverGuard::revalidate_all();
         return;
     }
@@ -2795,6 +2845,7 @@ void Application::init_printer_state() {
     // 3. Initialize Moonraker (creates client + API + history managers)
     if (!init_moonraker()) {
         spdlog::error("[Application] Failed to reinitialize Moonraker");
+        show_init_error();
         ObserverGuard::revalidate_all();
         return;
     }
@@ -2802,6 +2853,7 @@ void Application::init_printer_state() {
     // 4. Initialize panel subjects with API injection + post-init
     if (!init_panel_subjects()) {
         spdlog::error("[Application] Failed to reinitialize panel subjects");
+        show_init_error();
         ObserverGuard::revalidate_all();
         return;
     }
@@ -2809,6 +2861,7 @@ void Application::init_printer_state() {
     // 5. Recreate UI (app_layout from XML, wire navigation)
     if (!init_ui()) {
         spdlog::error("[Application] Failed to reinitialize UI");
+        show_init_error();
         ObserverGuard::revalidate_all();
         return;
     }

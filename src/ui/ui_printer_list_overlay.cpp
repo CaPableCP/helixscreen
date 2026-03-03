@@ -124,8 +124,13 @@ void PrinterListOverlay::populate_printer_list() {
         return;
     }
 
-    // Clean existing children before repopulating
-    lv_obj_clean(container);
+    // Clean existing children before repopulating (freeze queue to prevent
+    // background thread from enqueuing callbacks between drain and destroy)
+    {
+        auto freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
+        helix::ui::UpdateQueue::instance().drain();
+        lv_obj_clean(container);
+    }
 
     for (const auto& id : printer_ids) {
         bool is_active = (id == active_id);
@@ -182,10 +187,11 @@ void PrinterListOverlay::handle_switch_printer(const std::string& printer_id) {
     }
     spdlog::info("[{}] Switching to printer '{}'", get_name(), printer_id);
 
-    // Dismiss this overlay before soft restart tears down the UI
-    NavigationManager::instance().go_back();
-
-    NavigationManager::instance().trigger_printer_switch(printer_id);
+    // Defer dismiss + switch — we're inside a click event on a child widget
+    helix::ui::queue_update([printer_id]() {
+        NavigationManager::instance().go_back();
+        NavigationManager::instance().trigger_printer_switch(printer_id);
+    });
 }
 
 void PrinterListOverlay::handle_delete_printer(const std::string& printer_id) {
@@ -209,10 +215,11 @@ void PrinterListOverlay::handle_delete_printer(const std::string& printer_id) {
 void PrinterListOverlay::handle_add_printer() {
     spdlog::info("[{}] Add printer requested", get_name());
 
-    // Dismiss this overlay before soft restart into wizard
-    NavigationManager::instance().go_back();
-
-    NavigationManager::instance().trigger_add_printer();
+    // Defer dismiss + wizard launch — we're inside a click event on a child widget
+    helix::ui::queue_update([]() {
+        NavigationManager::instance().go_back();
+        NavigationManager::instance().trigger_add_printer();
+    });
 }
 
 // =============================================================================
@@ -287,6 +294,10 @@ void PrinterListOverlay::on_delete_confirm_cb(lv_event_t* e) {
         return;
     }
 
+    // Take ownership immediately to guard against double invocation
+    std::string printer_id = *id_ptr;
+    delete id_ptr;
+
     // Close the modal first
     lv_obj_t* top = Modal::get_top();
     if (top) {
@@ -295,9 +306,9 @@ void PrinterListOverlay::on_delete_confirm_cb(lv_event_t* e) {
 
     auto* cfg = Config::get_instance();
     if (cfg) {
-        bool was_active = (*id_ptr == cfg->get_active_printer_id());
-        spdlog::info("[PrinterListOverlay] Removing printer '{}'", *id_ptr);
-        cfg->remove_printer(*id_ptr);
+        bool was_active = (printer_id == cfg->get_active_printer_id());
+        spdlog::info("[PrinterListOverlay] Removing printer '{}'", printer_id);
+        cfg->remove_printer(printer_id);
         cfg->save();
 
         if (was_active) {
@@ -323,13 +334,18 @@ void PrinterListOverlay::on_delete_confirm_cb(lv_event_t* e) {
         }
     }
 
-    delete id_ptr;
-
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PrinterListOverlay::on_delete_cancel_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrinterListOverlay] on_delete_cancel_cb");
+
+    // Take ownership immediately to guard against double invocation
+    auto* id_ptr = static_cast<std::string*>(lv_event_get_user_data(e));
+    if (!id_ptr) {
+        return;
+    }
+    delete id_ptr;
 
     // Close the modal
     lv_obj_t* top = Modal::get_top();
@@ -337,8 +353,6 @@ void PrinterListOverlay::on_delete_cancel_cb(lv_event_t* e) {
         Modal::hide(top);
     }
 
-    auto* id_ptr = static_cast<std::string*>(lv_event_get_user_data(e));
-    delete id_ptr;
     LVGL_SAFE_EVENT_CB_END();
 }
 

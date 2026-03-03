@@ -299,6 +299,11 @@ class ModalStack {
         return stack_.empty();
     }
 
+    // Clear all modal tracking (used during teardown when widgets are destroyed externally)
+    void clear() {
+        stack_.clear();
+    }
+
     // Mark a modal as exiting (animation in progress, ignore further hide() calls)
     // Returns true if found and marked, false if not found or already exiting
     bool mark_exiting(lv_obj_t* backdrop);

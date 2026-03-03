@@ -1479,6 +1479,11 @@ void NavigationManager::shutdown() {
     panel_stack_.clear();
     zoom_source_rects_.clear();
 
+    // Clear printer callbacks — they capture Application pointers that become
+    // invalid after soft restart tears down and rebuilds printer state
+    printer_switch_cb_ = nullptr;
+    add_printer_cb_ = nullptr;
+
     spdlog::trace("[NavigationManager] Shutdown complete");
 }
 
@@ -1574,7 +1579,10 @@ void NavigationManager::deinit_subjects() {
     zoom_source_rects_.clear();
     panel_stack_.clear();
     app_layout_widget_ = nullptr;
-    overlay_backdrop_ = nullptr;
+    if (overlay_backdrop_) {
+        lv_obj_del(overlay_backdrop_);
+        overlay_backdrop_ = nullptr;
+    }
     navbar_widget_ = nullptr;
     active_panel_ = PanelId::Home;
     previous_connection_state_ = -1;

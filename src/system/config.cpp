@@ -13,6 +13,8 @@ using AppConstants::Update::PREUPDATE_ENV_BACKUP;
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
+#include <cstdio>
 #include <fstream>
 #include <iomanip>
 #include <sys/stat.h>
@@ -322,6 +324,14 @@ static void migrate_v3_to_v4(json& config) {
 
     // Remove the old singular "printer" key
     config.erase("printer");
+
+    // Migrate /display/printer_image to per-printer /printers/{id}/printer_image
+    if (config.contains("display") && config["display"].contains("printer_image")) {
+        config["printers"][slug]["printer_image"] = config["display"]["printer_image"];
+        config["display"].erase("printer_image");
+        spdlog::info("[Config] Migration v4: moved /display/printer_image to /printers/{}/printer_image",
+                     slug);
+    }
 
     spdlog::info("[Config] Migration v4: restructured /printer to /printers/{}", slug);
 }
@@ -769,17 +779,27 @@ void Config::add_printer(const std::string& printer_id, const json& printer_data
 
 void Config::remove_printer(const std::string& printer_id) {
     if (!data.contains("printers") || !data["printers"].contains(printer_id)) {
-        spdlog::warn("[Config] Cannot remove unknown printer '{}'", printer_id);
+        spdlog::warn("[Config] Cannot remove non-existent printer '{}'", printer_id);
         return;
     }
+
+    // Prevent removing the last printer
+    if (data["printers"].size() <= 1) {
+        spdlog::error("[Config] Cannot remove last printer '{}' — at least one printer must exist",
+                       printer_id);
+        return;
+    }
+
     data["printers"].erase(printer_id);
     spdlog::info("[Config] Removed printer '{}'", printer_id);
 
-    // Clear active if we just removed the active printer
+    // If we just removed the active printer, switch to the first remaining one
     if (active_printer_id_ == printer_id) {
-        active_printer_id_.clear();
-        data["active_printer_id"] = "";
-        spdlog::warn("[Config] Removed active printer — active_printer_id cleared");
+        auto remaining_id = data["printers"].begin().key();
+        active_printer_id_ = remaining_id;
+        data["active_printer_id"] = remaining_id;
+        spdlog::info("[Config] Auto-switched to printer '{}' after removing '{}'", remaining_id,
+                     printer_id);
     }
 }
 
@@ -832,22 +852,35 @@ bool Config::save() {
     spdlog::trace("[Config] Saving config to {}", path);
 
     try {
-        std::ofstream o(path);
-        if (!o.is_open()) {
-            NOTIFY_ERROR("Could not save configuration file");
-            LOG_ERROR_INTERNAL("Failed to open config file for writing: {}", path);
+        // Atomic save: write to temp file, then rename to avoid partial writes on crash/power loss
+        std::string tmp_path = path + ".tmp";
+        {
+            std::ofstream o(tmp_path);
+            if (!o.is_open()) {
+                NOTIFY_ERROR("Could not save configuration file");
+                LOG_ERROR_INTERNAL("Failed to open temp file for writing: {}", tmp_path);
+                return false;
+            }
+
+            o << std::setw(2) << data << std::endl;
+            o.flush();
+
+            if (!o.good()) {
+                NOTIFY_ERROR("Error writing configuration file");
+                LOG_ERROR_INTERNAL("Failed to write config to temp file: {}", tmp_path);
+                std::remove(tmp_path.c_str());
+                return false;
+            }
+        }
+
+        if (std::rename(tmp_path.c_str(), path.c_str()) != 0) {
+            NOTIFY_ERROR("Failed to save configuration file");
+            LOG_ERROR_INTERNAL("Failed to rename temp file '{}' to '{}': {}", tmp_path, path,
+                               strerror(errno));
+            std::remove(tmp_path.c_str());
             return false;
         }
 
-        o << std::setw(2) << data << std::endl;
-
-        if (!o.good()) {
-            NOTIFY_ERROR("Error writing configuration file");
-            LOG_ERROR_INTERNAL("Error writing to config file: {}", path);
-            return false;
-        }
-
-        o.close();
         spdlog::trace("[Config] saved successfully to {}", path);
         return true;
 

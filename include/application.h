@@ -170,6 +170,7 @@ class Application {
     bool m_running = false;
     bool m_wizard_active = false;
     bool m_shutdown_complete = false;
+    bool m_soft_restart_in_progress = false;
 
     // Tracks previous printer when adding a new one via wizard (for cancel recovery)
     std::string m_wizard_previous_printer_id;

@@ -1826,7 +1826,7 @@ TEST_CASE_METHOD(ConfigTestFixture, "Config: add_printer creates new printer ent
 }
 
 TEST_CASE_METHOD(ConfigTestFixture,
-                 "Config: remove_printer deletes entry and clears active if needed",
+                 "Config: remove_printer deletes entry and auto-selects remaining printer",
                  "[core][config][multi-printer]") {
     set_data_for_plural_test({{"active_printer_id", "voron"},
                               {"printers",
@@ -1838,8 +1838,8 @@ TEST_CASE_METHOD(ConfigTestFixture,
 
     auto ids = config.get_printer_ids();
     REQUIRE(ids.size() == 1);
-    // Active should be cleared since we removed the active printer
-    REQUIRE(config.get_active_printer_id().empty());
+    // Active should auto-switch to remaining printer since we removed the active one
+    REQUIRE(config.get_active_printer_id() == "ender3");
 }
 
 TEST_CASE_METHOD(ConfigTestFixture, "Config: remove_printer keeps active if removing non-active",
@@ -1852,6 +1852,20 @@ TEST_CASE_METHOD(ConfigTestFixture, "Config: remove_printer keeps active if remo
 
     config.remove_printer("ender3");
 
+    REQUIRE(config.get_printer_ids().size() == 1);
+    REQUIRE(config.get_active_printer_id() == "voron");
+}
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: remove_printer prevents removing last printer",
+                 "[core][config][multi-printer]") {
+    set_data_for_plural_test({{"active_printer_id", "voron"},
+                              {"printers", {{"voron", {{"moonraker_host", "192.168.1.10"}}}}}});
+    config.set_active_printer("voron");
+
+    config.remove_printer("voron");
+
+    // Should still have the printer — cannot remove the last one
     REQUIRE(config.get_printer_ids().size() == 1);
     REQUIRE(config.get_active_printer_id() == "voron");
 }
