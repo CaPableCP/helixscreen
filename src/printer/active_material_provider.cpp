@@ -21,7 +21,7 @@ ActiveMaterial build_active_material(const SlotInfo& slot) {
     } else if (!slot.material.empty()) {
         result.display_name = slot.material;
     } else {
-        result.display_name = "Unknown";
+        result.display_name = "Unknown"; // i18n: do not translate (generic fallback label)
     }
 
     // Resolve material_info from filament database (with user overrides)
@@ -53,7 +53,7 @@ ActiveMaterial build_active_material(const SlotInfo& slot) {
             .category = "Unknown",
             .dry_temp_c = 0,
             .dry_time_min = 0,
-            .density_g_cm3 = 1.24f,
+            .density_g_cm3 = 1.25f, // Generic plastic average
             .chamber_temp_c = 0,
             .compat_group = "UNKNOWN",
         };

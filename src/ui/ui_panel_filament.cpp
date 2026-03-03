@@ -818,7 +818,8 @@ void FilamentPanel::handle_purge_button() {
         spdlog::info("[{}] Using StandardMacros purge: {}", get_name(), info.get_macro());
         NOTIFY_INFO("Purging nozzle...");
 
-        // Auto-pass PURGE_TEMP from active material if available
+        // Auto-pass PURGE_TEMP from active material if available.
+        // Safe even if the macro doesn't use this param — Klipper ignores unknown params.
         std::map<std::string, std::string> params;
         auto active = helix::get_active_material();
         if (active) {
@@ -984,7 +985,10 @@ void FilamentPanel::setup_external_spool_display() {
     // Observe external spool color changes to reactively update display
     external_spool_observer_ = observe_int_sync<FilamentPanel>(
         AmsState::instance().get_external_spool_color_subject(), this,
-        [](FilamentPanel* self, int /*color_int*/) { self->update_external_spool_from_state(); });
+        [](FilamentPanel* self, int /*color_int*/) {
+            self->update_external_spool_from_state();
+            self->update_spool_preset();
+        });
 
     spdlog::debug("[{}] External spool display initialized", get_name());
 }
@@ -1236,7 +1240,6 @@ void FilamentPanel::on_preset_tpu_clicked(lv_event_t* e) {
 
 void FilamentPanel::on_preset_spool_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[FilamentPanel] on_preset_spool_clicked");
-    LV_UNUSED(e);
     get_global_filament_panel().handle_spool_preset_button();
     LVGL_SAFE_EVENT_CB_END();
 }
@@ -1308,7 +1311,9 @@ void FilamentPanel::update_spool_preset() {
         }
     }
 
-    // Novel material — show spool preset button
+    // Novel material — show spool preset button.
+    // Using lv_label_set_text directly: text is dynamic (material name + computed temps)
+    // so subject binding is not practical here.
     lv_obj_remove_flag(spool_preset_row_, LV_OBJ_FLAG_HIDDEN);
 
     if (spool_preset_label_) {

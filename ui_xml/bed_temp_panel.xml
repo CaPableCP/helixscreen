@@ -81,7 +81,8 @@
           </ui_button>
           <!-- Dynamic spool preset (hidden by default, shown when active spool has novel material) -->
           <ui_button name="preset_spool" width="100%" text="" flag_hidden="true">
-            <event_cb trigger="clicked" callback="on_bed_preset_spool_clicked"/>
+            <event_cb trigger="clicked" callback="on_heater_preset_clicked"/>
+            <lv_label name="spool_preset_label" text=""/>
           </ui_button>
         </lv_obj>
         <ui_button name="btn_custom" width="100%" text="Custom..." translation_tag="Custom..." variant="secondary">

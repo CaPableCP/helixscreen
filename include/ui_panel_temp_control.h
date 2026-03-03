@@ -239,8 +239,6 @@ class TempControlPanel {
     static void on_bed_preset_pla_clicked(lv_event_t* e);
     static void on_bed_preset_petg_clicked(lv_event_t* e);
     static void on_bed_preset_abs_clicked(lv_event_t* e);
-    static void on_nozzle_preset_spool_clicked(lv_event_t* e);
-    static void on_bed_preset_spool_clicked(lv_event_t* e);
     static void on_nozzle_custom_clicked(lv_event_t* e);
     static void on_bed_custom_clicked(lv_event_t* e);
 

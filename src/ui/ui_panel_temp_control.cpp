@@ -178,8 +178,6 @@ TempControlPanel::TempControlPanel(PrinterState& printer_state, MoonrakerAPI* ap
         {"on_bed_preset_petg_clicked", on_bed_preset_petg_clicked},
         {"on_bed_preset_abs_clicked", on_bed_preset_abs_clicked},
         {"on_bed_custom_clicked", on_bed_custom_clicked},
-        {"on_nozzle_preset_spool_clicked", on_nozzle_preset_spool_clicked},
-        {"on_bed_preset_spool_clicked", on_bed_preset_spool_clicked},
     });
 
     spdlog::debug("[TempPanel] Constructed - subscribed to PrinterState temperature subjects");
@@ -1039,10 +1037,12 @@ void TempControlPanel::setup_spool_preset(helix::HeaterType type, lv_obj_t* over
         return;
     }
 
-    // Check if material matches a standard preset (case-insensitive)
+    // Check if material matches a standard preset (case-insensitive).
+    // Include TPU even though temp panels don't have a TPU button — showing a spool
+    // preset for a well-known material would be confusing.
     std::string mat_upper = active->material_name;
     std::transform(mat_upper.begin(), mat_upper.end(), mat_upper.begin(), ::toupper);
-    if (mat_upper == "PLA" || mat_upper == "PETG" || mat_upper == "ABS") {
+    if (mat_upper == "PLA" || mat_upper == "PETG" || mat_upper == "ABS" || mat_upper == "TPU") {
         spdlog::debug("[TempPanel] {} spool preset: material '{}' matches standard preset",
                       heater_label(type), active->material_name);
         return;
@@ -1067,34 +1067,19 @@ void TempControlPanel::setup_spool_preset(helix::HeaterType type, lv_obj_t* over
     data = {this, type, temp};
     lv_obj_set_user_data(btn, &data);
 
-    // Format button label: "MaterialName (Temp°C)"
+    // Format button label: "MaterialName (Temp°C)".
+    // Using lv_label_set_text directly: text is dynamic (material name + computed temp).
     auto& buf = spool_preset_label_bufs_[idx(type)];
     snprintf(buf.data(), buf.size(), "%s (%d°C)", active->display_name.c_str(), temp);
 
-    lv_obj_t* label = lv_obj_get_child(btn, 0);
+    lv_obj_t* label = lv_obj_find_by_name(btn, "spool_preset_label");
     if (label) {
         lv_label_set_text(label, buf.data());
     }
 
-    lv_obj_clear_flag(btn, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(btn, LV_OBJ_FLAG_HIDDEN);
     spdlog::debug("[TempPanel] {} spool preset: '{}' at {}°C", heater_label(type),
                   active->display_name, temp);
-}
-
-void TempControlPanel::on_nozzle_preset_spool_clicked(lv_event_t* e) {
-    lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    auto* data = static_cast<PresetButtonData*>(lv_obj_get_user_data(btn));
-    if (data && data->panel) {
-        data->panel->send_temperature(HeaterType::Nozzle, data->preset_value);
-    }
-}
-
-void TempControlPanel::on_bed_preset_spool_clicked(lv_event_t* e) {
-    lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    auto* data = static_cast<PresetButtonData*>(lv_obj_get_user_data(btn));
-    if (data && data->panel) {
-        data->panel->send_temperature(HeaterType::Bed, data->preset_value);
-    }
 }
 
 void TempControlPanel::on_nozzle_custom_clicked(lv_event_t* e) {
