@@ -1638,3 +1638,28 @@ TEST_CASE_METHOD(ConfigTestFixture,
 
     std::filesystem::remove_all(temp_dir);
 }
+
+// ============================================================================
+// Preset detection tests
+// ============================================================================
+
+TEST_CASE_METHOD(ConfigTestFixture, "has_preset returns false for default config",
+                 "[config][preset]") {
+    get_data() = json::object();
+    REQUIRE(config.has_preset() == false);
+    REQUIRE(config.get_preset().empty());
+}
+
+TEST_CASE_METHOD(ConfigTestFixture, "has_preset returns true when preset field is set",
+                 "[config][preset]") {
+    get_data() = {{"preset", "ad5m"}};
+    REQUIRE(config.has_preset() == true);
+    REQUIRE(config.get_preset() == "ad5m");
+}
+
+TEST_CASE_METHOD(ConfigTestFixture, "has_preset returns false for empty preset string",
+                 "[config][preset]") {
+    get_data() = {{"preset", ""}};
+    REQUIRE(config.has_preset() == false);
+    REQUIRE(config.get_preset().empty());
+}
