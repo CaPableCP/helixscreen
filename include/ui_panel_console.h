@@ -143,6 +143,8 @@ class ConsolePanel : public OverlayBase {
     SubjectManager subjects_;
     char status_buf_[128] = {};
     lv_subject_t status_subject_{};
+    lv_subject_t status_visible_subject_{};  ///< 1 = status text visible, 0 = hidden
+    lv_subject_t has_entries_subject_{};     ///< 1 = has console entries, 0 = empty
 
     // Callback registration tracking
     bool callbacks_registered_ = false;

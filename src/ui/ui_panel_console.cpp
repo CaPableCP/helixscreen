@@ -192,6 +192,12 @@ void ConsolePanel::init_subjects() {
         UI_MANAGED_SUBJECT_STRING(status_subject_, status_buf_,
                                   lv_tr("Loading history..."), "console_status",
                                   subjects_);
+        // Status label visibility (1 = visible, 0 = hidden)
+        UI_MANAGED_SUBJECT_INT(status_visible_subject_, 1, "console_status_visible",
+                               subjects_);
+        // Entry presence (1 = has entries, 0 = empty/show empty state)
+        UI_MANAGED_SUBJECT_INT(has_entries_subject_, 0, "console_has_entries",
+                               subjects_);
     });
 }
 
@@ -230,7 +236,10 @@ void ConsolePanel::register_callbacks() {
                  lv_tr("Clear Console?"),
                  lv_tr("This will remove all entries from the display."),
                  ModalSeverity::Info, lv_tr("Clear"),
-                 [](lv_event_t* /*e*/) { get_global_console_panel().clear_display(); },
+                 [](lv_event_t* /*e*/) {
+                     Modal::hide(Modal::get_top());
+                     get_global_console_panel().clear_display();
+                 },
                  nullptr, nullptr);
          }},
         {"on_console_filter_toggled",
@@ -263,7 +272,9 @@ lv_obj_t* ConsolePanel::create(lv_obj_t* parent) {
     lv_obj_t* overlay_content = lv_obj_find_by_name(overlay_root_, "overlay_content");
     if (overlay_content) {
         console_container_ = lv_obj_find_by_name(overlay_content, "console_container");
-        empty_state_ = lv_obj_find_by_name(overlay_content, "empty_state");
+        empty_state_ = console_container_
+                           ? lv_obj_find_by_name(console_container_, "empty_state")
+                           : nullptr;
         status_label_ = lv_obj_find_by_name(overlay_content, "status_message");
 
         // Find the input row and get the text input
@@ -523,6 +534,9 @@ void ConsolePanel::populate_entries(const std::vector<GcodeEntry>& entries) {
         create_entry_widget(entry);
     }
 
+    // Clear "Loading..." status — fetch succeeded regardless of entry count
+    status_buf_[0] = '\0';
+
     update_visibility();
     scroll_to_bottom();
 }
@@ -613,8 +627,18 @@ void ConsolePanel::create_entry_widget(const GcodeEntry& entry) {
 void ConsolePanel::clear_entries() {
     entries_.clear();
 
-    if (console_container_) {
-        lv_obj_clean(console_container_);
+    if (!console_container_) {
+        return;
+    }
+
+    // Delete all children except the empty_state_ widget (which lives inside
+    // the container to share its dark background)
+    uint32_t count = lv_obj_get_child_count(console_container_);
+    for (int32_t i = static_cast<int32_t>(count) - 1; i >= 0; i--) {
+        lv_obj_t* child = lv_obj_get_child(console_container_, i);
+        if (child != empty_state_) {
+            lv_obj_delete(child);
+        }
     }
 }
 
@@ -674,16 +698,10 @@ bool ConsolePanel::is_temp_message(const std::string& message) {
 }
 
 void ConsolePanel::update_visibility() {
-    bool has_entries = !entries_.empty();
-
-    // Toggle visibility: show console OR empty state
-    helix::ui::toggle_list_empty_state(console_container_, empty_state_, has_entries);
-
-    // Clear status message when entries are loaded (error/loading set elsewhere)
-    if (has_entries) {
-        status_buf_[0] = '\0';
-    }
+    // Drive visibility via subjects — XML bindings handle show/hide
+    lv_subject_set_int(&has_entries_subject_, entries_.empty() ? 0 : 1);
     lv_subject_copy_string(&status_subject_, status_buf_);
+    lv_subject_set_int(&status_visible_subject_, status_buf_[0] != '\0' ? 1 : 0);
 }
 
 // ============================================================================
@@ -791,8 +809,11 @@ void ConsolePanel::add_entry(const GcodeEntry& entry) {
     // Enforce max size (remove oldest)
     while (entries_.size() > MAX_ENTRIES && console_container_) {
         entries_.pop_front();
-        // Remove oldest widget (first child)
+        // Remove oldest entry widget (first child that isn't empty_state_)
         lv_obj_t* first_child = lv_obj_get_child(console_container_, 0);
+        if (first_child == empty_state_) {
+            first_child = lv_obj_get_child(console_container_, 1);
+        }
         helix::ui::safe_delete(first_child);
     }
 
