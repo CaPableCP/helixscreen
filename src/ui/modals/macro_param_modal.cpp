@@ -2,12 +2,84 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "macro_param_modal.h"
+#include "macro_param_cache.h"
 
 #include "ui_event_safety.h"
 
+#include "lvgl/src/others/translation/lv_translation.h"
+
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <regex>
+#include <set>
+
 using namespace helix;
+
+// ============================================================================
+// parse_macro_params — extract Klipper gcode_macro parameters from template
+// ============================================================================
+
+std::vector<MacroParam> helix::parse_macro_params(const std::string& gcode_template) {
+    std::vector<MacroParam> result;
+    std::set<std::string> seen;
+
+    // Match params.NAME, params['NAME'], params["NAME"]
+    // Optional trailing |default(VALUE) or | default(VALUE)
+    std::regex param_re(
+        R"RE(params\.([A-Za-z_][A-Za-z0-9_]*)|params\['([A-Za-z_][A-Za-z0-9_]*)'\]|params\["([A-Za-z_][A-Za-z0-9_]*)"\])RE");
+
+    auto it = std::sregex_iterator(gcode_template.begin(), gcode_template.end(), param_re);
+    auto end = std::sregex_iterator();
+
+    for (; it != end; ++it) {
+        const auto& match = *it;
+
+        // Extract name from whichever group matched
+        std::string name;
+        if (match[1].matched)
+            name = match[1].str();
+        else if (match[2].matched)
+            name = match[2].str();
+        else if (match[3].matched)
+            name = match[3].str();
+
+        // Normalize to uppercase
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c) { return std::toupper(c); });
+
+        // Skip duplicates
+        if (seen.count(name)) {
+            continue;
+        }
+        seen.insert(name);
+
+        // Try to extract |default(VALUE) after the match
+        std::string default_value;
+        auto suffix_start = match.suffix().first;
+        auto suffix_end = gcode_template.cend();
+        std::string suffix(suffix_start, suffix_end);
+
+        // Look for |default(...) or | default(...) immediately after
+        std::regex default_re(R"(^\s*\|\s*default\(([^)]*)\))");
+        std::smatch default_match;
+        if (std::regex_search(suffix, default_match, default_re)) {
+            default_value = default_match[1].str();
+            // Strip surrounding quotes from string defaults
+            if (default_value.size() >= 2) {
+                char first = default_value.front();
+                char last = default_value.back();
+                if ((first == '\'' && last == '\'') || (first == '"' && last == '"')) {
+                    default_value = default_value.substr(1, default_value.size() - 2);
+                }
+            }
+        }
+
+        result.push_back({name, default_value});
+    }
+
+    return result;
+}
 
 MacroParamModal* MacroParamModal::s_active_instance_ = nullptr;
 
@@ -17,14 +89,30 @@ void MacroParamModal::show_for_macro(lv_obj_t* parent, const std::string& macro_
     macro_name_ = macro_name;
     params_ = params;
     on_execute_ = std::move(on_execute);
+    raw_mode_ = false;
+    show_common(parent);
+}
+
+void MacroParamModal::show_for_unknown_params(lv_obj_t* parent, const std::string& macro_name,
+                                               MacroExecuteCallback on_execute) {
+    macro_name_ = macro_name;
+    params_.clear();
+    on_execute_ = std::move(on_execute);
+    raw_mode_ = true;
+    show_common(parent);
+}
+
+void MacroParamModal::show_common(lv_obj_t* parent) {
     textareas_.clear();
+    raw_textarea_ = nullptr;
 
     // Register callbacks before showing (idempotent)
     lv_xml_register_event_cb(nullptr, "macro_param_modal_run_cb", MacroParamModal::run_cb);
     lv_xml_register_event_cb(nullptr, "macro_param_modal_cancel_cb", MacroParamModal::cancel_cb);
 
     if (!show(parent)) {
-        spdlog::error("[MacroParamModal] Failed to show modal");
+        spdlog::error("[MacroParamModal] Failed to show modal{}", raw_mode_ ? " (raw mode)" : "");
+        raw_mode_ = false;
         return;
     }
 
@@ -43,16 +131,19 @@ void MacroParamModal::on_show() {
 
 void MacroParamModal::on_ok() {
     if (on_execute_) {
-        auto values = collect_values();
-        on_execute_(values);
+        on_execute_(collect_values());
     }
-    textareas_.clear(); // Clear before hide() — widgets are about to be deleted
-    s_active_instance_ = nullptr;
-    hide();
+    dismiss();
 }
 
 void MacroParamModal::on_cancel() {
-    textareas_.clear(); // Clear before hide() — widgets are about to be deleted
+    dismiss();
+}
+
+void MacroParamModal::dismiss() {
+    raw_mode_ = false;
+    raw_textarea_ = nullptr;
+    textareas_.clear(); // Clear before hide() -- widgets are about to be deleted
     s_active_instance_ = nullptr;
     hide();
 }
@@ -66,37 +157,41 @@ void MacroParamModal::populate_param_fields() {
 
     textareas_.clear();
 
-    for (const auto& param : params_) {
-        // Container for label + textarea
-        lv_obj_t* field = lv_obj_create(param_list);
-        lv_obj_set_width(field, LV_PCT(100));
-        lv_obj_set_height(field, LV_SIZE_CONTENT);
-        lv_obj_set_style_pad_all(field, 0, 0);
-        lv_obj_set_style_pad_gap(field, 2, 0);
-        lv_obj_set_flex_flow(field, LV_FLEX_FLOW_COLUMN);
-        lv_obj_remove_flag(field, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_style_bg_opa(field, 0, 0);
-        lv_obj_set_style_border_width(field, 0, 0);
+    if (raw_mode_) {
+        const char* attrs[] = {"label",       lv_tr("Parameters"),
+                               "placeholder", lv_tr("e.g. NAME=my_var VALUE=123"),
+                               nullptr,       nullptr};
+        lv_obj_t* field =
+            static_cast<lv_obj_t*>(lv_xml_create(param_list, "form_field", attrs));
+        if (field) {
+            raw_textarea_ = lv_obj_find_by_name(field, "field_input");
+        }
+        spdlog::debug("[MacroParamModal] Created raw param field for {}", macro_name_);
+        return;
+    }
 
-        // Label with param name
-        lv_obj_t* label = lv_label_create(field);
+    for (const auto& param : params_) {
         // Prettify: lowercase with first letter capitalized
         std::string display_name = param.name;
         std::transform(display_name.begin(), display_name.end(), display_name.begin(), ::tolower);
         if (!display_name.empty()) {
             display_name[0] = static_cast<char>(::toupper(display_name[0]));
         }
-        lv_label_set_text(label, display_name.c_str());
-        lv_obj_set_style_text_font(label, lv_font_get_default(), 0);
 
-        // Textarea with default value
-        lv_obj_t* textarea = lv_textarea_create(field);
-        lv_obj_set_width(textarea, LV_PCT(100));
-        lv_obj_set_height(textarea, LV_SIZE_CONTENT);
-        lv_textarea_set_one_line(textarea, true);
-        lv_textarea_set_placeholder_text(textarea, param.name.c_str());
+        // Create form_field component (label + themed text_input with keyboard wiring)
+        const char* attrs[] = {"label",       display_name.c_str(),
+                               "placeholder", param.name.c_str(),
+                               nullptr,       nullptr};
+        lv_obj_t* field =
+            static_cast<lv_obj_t*>(lv_xml_create(param_list, "form_field", attrs));
+        if (!field) {
+            spdlog::warn("[MacroParamModal] Failed to create form_field for {}", param.name);
+            continue;
+        }
 
-        if (!param.default_value.empty()) {
+        // Find the text_input inside the form_field to set default value
+        lv_obj_t* textarea = lv_obj_find_by_name(field, "field_input");
+        if (textarea && !param.default_value.empty()) {
             lv_textarea_set_text(textarea, param.default_value.c_str());
         }
 
@@ -107,6 +202,14 @@ void MacroParamModal::populate_param_fields() {
 }
 
 std::map<std::string, std::string> MacroParamModal::collect_values() const {
+    if (raw_mode_ && raw_textarea_) {
+        const char* text = lv_textarea_get_text(raw_textarea_);
+        if (text && text[0] != '\0') {
+            return MacroParamCache::parse_raw_params(text);
+        }
+        return {};
+    }
+
     std::map<std::string, std::string> result;
 
     for (size_t i = 0; i < params_.size() && i < textareas_.size(); ++i) {

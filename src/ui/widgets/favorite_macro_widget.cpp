@@ -11,47 +11,37 @@
 #include "ui_utils.h"
 
 #include "app_globals.h"
-#include "config.h"
 #include "device_display_name.h"
 #include "lvgl/src/others/translation/lv_translation.h"
-#include "macro_param_modal.h"
 #include "moonraker_api.h"
 #include "panel_widget_config.h"
+#include "panel_widget_manager.h"
 #include "panel_widget_registry.h"
 #include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
-#include <regex>
-#include <set>
 
 namespace helix {
 void register_favorite_macro_widgets() {
-    register_widget_factory("favorite_macro_1", []() {
-        return std::make_unique<FavoriteMacroWidget>("favorite_macro_1");
-    });
-    register_widget_factory("favorite_macro_2", []() {
-        return std::make_unique<FavoriteMacroWidget>("favorite_macro_2");
-    });
+    for (int i = 1; i <= kMaxFavoriteMacroSlots; ++i) {
+        std::string id = "favorite_macro_" + std::to_string(i);
+        register_widget_factory(id, [id]() {
+            return std::make_unique<FavoriteMacroWidget>(id);
+        });
+    }
     // Register XML callbacks early — before any XML is parsed
-    lv_xml_register_event_cb(nullptr, "favorite_macro_1_clicked_cb",
-                             FavoriteMacroWidget::clicked_1_cb);
-    lv_xml_register_event_cb(nullptr, "favorite_macro_2_clicked_cb",
-                             FavoriteMacroWidget::clicked_2_cb);
+    lv_xml_register_event_cb(nullptr, "favorite_macro_clicked_cb",
+                             FavoriteMacroWidget::clicked_cb);
     lv_xml_register_event_cb(nullptr, "fav_macro_picker_backdrop_cb",
                              FavoriteMacroWidget::picker_backdrop_cb);
 }
 } // namespace helix
 
 namespace {
-// File-local helper: get the shared PanelWidgetConfig instance
-helix::PanelWidgetConfig& get_widget_config_ref() {
-    static helix::PanelWidgetConfig config("home", *helix::Config::get_instance());
-    config.load();
-    return config;
-}
 // File-local helper: single shared MacroParamModal instance.
 // Using one instance avoids s_active_instance_ stomping when two widget slots
 // both try to open param modals (the old code had two separate static locals).
@@ -59,74 +49,24 @@ helix::MacroParamModal& get_shared_param_modal() {
     static helix::MacroParamModal modal;
     return modal;
 }
+
+/// Free heap-allocated macro name strings stored as user_data on picker rows.
+/// Called from both dismiss_macro_picker() and the LV_EVENT_DELETE handler.
+void cleanup_picker_row_strings(lv_obj_t* backdrop) {
+    lv_obj_t* macro_list = lv_obj_find_by_name(backdrop, "macro_list");
+    if (!macro_list)
+        return;
+    uint32_t count = lv_obj_get_child_count(macro_list);
+    for (uint32_t i = 0; i < count; ++i) {
+        lv_obj_t* row = lv_obj_get_child(macro_list, i);
+        auto* name_ptr = static_cast<std::string*>(lv_obj_get_user_data(row));
+        delete name_ptr;
+        lv_obj_set_user_data(row, nullptr);
+    }
+}
 } // namespace
 
 using namespace helix;
-
-// ============================================================================
-// parse_macro_params — extract Klipper gcode_macro parameters from template
-// ============================================================================
-
-std::vector<MacroParam> helix::parse_macro_params(const std::string& gcode_template) {
-    std::vector<MacroParam> result;
-    std::set<std::string> seen;
-
-    // Match params.NAME, params['NAME'], params["NAME"]
-    // Optional trailing |default(VALUE) or | default(VALUE)
-    std::regex param_re(
-        R"RE(params\.([A-Za-z_][A-Za-z0-9_]*)|params\['([A-Za-z_][A-Za-z0-9_]*)'\]|params\["([A-Za-z_][A-Za-z0-9_]*)"\])RE");
-
-    auto it = std::sregex_iterator(gcode_template.begin(), gcode_template.end(), param_re);
-    auto end = std::sregex_iterator();
-
-    for (; it != end; ++it) {
-        const auto& match = *it;
-
-        // Extract name from whichever group matched
-        std::string name;
-        if (match[1].matched)
-            name = match[1].str();
-        else if (match[2].matched)
-            name = match[2].str();
-        else if (match[3].matched)
-            name = match[3].str();
-
-        // Normalize to uppercase
-        std::transform(name.begin(), name.end(), name.begin(),
-                       [](unsigned char c) { return std::toupper(c); });
-
-        // Skip duplicates
-        if (seen.count(name)) {
-            continue;
-        }
-        seen.insert(name);
-
-        // Try to extract |default(VALUE) after the match
-        std::string default_value;
-        auto suffix_start = match.suffix().first;
-        auto suffix_end = gcode_template.cend();
-        std::string suffix(suffix_start, suffix_end);
-
-        // Look for |default(...) or | default(...) immediately after
-        std::regex default_re(R"(^\s*\|\s*default\(([^)]*)\))");
-        std::smatch default_match;
-        if (std::regex_search(suffix, default_match, default_re)) {
-            default_value = default_match[1].str();
-            // Strip surrounding quotes from string defaults
-            if (default_value.size() >= 2) {
-                char first = default_value.front();
-                char last = default_value.back();
-                if ((first == '\'' && last == '\'') || (first == '"' && last == '"')) {
-                    default_value = default_value.substr(1, default_value.size() - 2);
-                }
-            }
-        }
-
-        result.push_back({name, default_value});
-    }
-
-    return result;
-}
 
 // ============================================================================
 // FavoriteMacroWidget
@@ -138,6 +78,13 @@ FavoriteMacroWidget::FavoriteMacroWidget(const std::string& widget_id) : widget_
 
 FavoriteMacroWidget::~FavoriteMacroWidget() {
     detach();
+}
+
+void FavoriteMacroWidget::set_config(const nlohmann::json& config) {
+    if (config.contains("macro") && config["macro"].is_string()) {
+        macro_name_ = config["macro"].get<std::string>();
+        spdlog::debug("[FavoriteMacroWidget] Config: {}={}", widget_id_, macro_name_);
+    }
 }
 
 void FavoriteMacroWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
@@ -160,8 +107,6 @@ void FavoriteMacroWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) 
     icon_label_ = lv_obj_find_by_name(widget_obj_, "fav_macro_icon");
     name_label_ = lv_obj_find_by_name(widget_obj_, "fav_macro_name");
 
-    // Load saved macro from config
-    load_config();
     update_display();
 
     spdlog::debug("[FavoriteMacroWidget] Attached {} (macro: {})", widget_id_,
@@ -249,22 +194,11 @@ void FavoriteMacroWidget::update_display() {
     }
 }
 
-void FavoriteMacroWidget::load_config() {
-    auto& wc = get_widget_config_ref();
-    auto config = wc.get_widget_config(widget_id_);
-    if (config.contains("macro") && config["macro"].is_string()) {
-        macro_name_ = config["macro"].get<std::string>();
-        spdlog::debug("[FavoriteMacroWidget] Loaded config: {}={}", widget_id_, macro_name_);
-    }
-}
-
 void FavoriteMacroWidget::save_config() {
     nlohmann::json config;
     config["macro"] = macro_name_;
-
-    auto& wc = get_widget_config_ref();
+    auto& wc = helix::PanelWidgetManager::instance().get_widget_config("home");
     wc.set_widget_config(widget_id_, config);
-
     spdlog::debug("[FavoriteMacroWidget] Saved config: {}={}", widget_id_, macro_name_);
 }
 
@@ -275,84 +209,37 @@ void FavoriteMacroWidget::fetch_and_execute() {
         return;
     }
 
-    // If params are already cached, use them directly
-    if (params_cached_) {
-        if (cached_params_.empty()) {
-            // No params — execute directly
-            execute_with_params({});
-        } else if (parent_screen_) {
-            // Has params — show modal (guard against widget destruction while modal is open)
+    auto cached = MacroParamCache::instance().get(macro_name_);
+
+    switch (cached.knowledge) {
+    case MacroParamKnowledge::KNOWN_NO_PARAMS:
+        execute_with_params({});
+        break;
+    case MacroParamKnowledge::KNOWN_PARAMS:
+        if (parent_screen_) {
             std::weak_ptr<bool> weak_alive = alive_;
             get_shared_param_modal().show_for_macro(
-                parent_screen_, macro_name_, cached_params_,
+                parent_screen_, macro_name_, cached.params,
                 [this, weak_alive](const std::map<std::string, std::string>& values) {
                     if (weak_alive.expired())
                         return;
                     execute_with_params(values);
                 });
         }
-        return;
-    }
-
-    // Query macro template to detect parameters
-    std::string object_name = "gcode_macro " + macro_name_;
-    nlohmann::json params;
-    params["objects"] = nlohmann::json::object();
-    params["objects"][object_name] = nlohmann::json::array({"gcode"});
-
-    std::weak_ptr<bool> weak_alive = alive_;
-    std::string macro_name_copy = macro_name_;
-
-    api->get_client().send_jsonrpc(
-        "printer.objects.query", params,
-        [this, weak_alive, macro_name_copy, object_name](nlohmann::json response) {
-            if (weak_alive.expired())
-                return;
-
-            std::string gcode_template;
-            try {
-                if (response.contains("result") && response["result"].contains("status") &&
-                    response["result"]["status"].contains(object_name) &&
-                    response["result"]["status"][object_name].contains("gcode")) {
-                    gcode_template =
-                        response["result"]["status"][object_name]["gcode"].get<std::string>();
-                }
-            } catch (const std::exception& e) {
-                spdlog::warn("[FavoriteMacroWidget] Failed to parse template for {}: {}",
-                             macro_name_copy, e.what());
-            }
-
-            // Parse and cache params (on UI thread via queue)
-            auto parsed = parse_macro_params(gcode_template);
-            ui::queue_update(
-                [this, weak_alive, parsed = std::move(parsed), macro_name_copy]() mutable {
+        break;
+    case MacroParamKnowledge::UNKNOWN:
+        if (parent_screen_) {
+            std::weak_ptr<bool> weak_alive = alive_;
+            get_shared_param_modal().show_for_unknown_params(
+                parent_screen_, macro_name_,
+                [this, weak_alive](const std::map<std::string, std::string>& values) {
                     if (weak_alive.expired())
                         return;
-
-                    cached_params_ = std::move(parsed);
-                    params_cached_ = true;
-
-                    spdlog::debug("[FavoriteMacroWidget] Cached {} params for {}",
-                                  cached_params_.size(), macro_name_copy);
-
-                    if (cached_params_.empty()) {
-                        execute_with_params({});
-                    } else if (parent_screen_) {
-                        // Guard against widget destruction while modal is open
-                        get_shared_param_modal().show_for_macro(
-                            parent_screen_, macro_name_, cached_params_,
-                            [this, weak_alive](const std::map<std::string, std::string>& values) {
-                                if (weak_alive.expired())
-                                    return;
-                                execute_with_params(values);
-                            });
-                    }
+                    execute_with_params(values);
                 });
-        },
-        [macro_name_copy](const MoonrakerError& err) {
-            spdlog::warn("[FavoriteMacroWidget] Failed to query template for {}: {}",
-                         macro_name_copy, err.message);
-        });
+        }
+        break;
+    }
 }
 
 void FavoriteMacroWidget::execute_with_params(const std::map<std::string, std::string>& params) {
@@ -494,23 +381,13 @@ void FavoriteMacroWidget::show_macro_picker() {
         picker_backdrop_,
         [](lv_event_t* e) {
             auto* self = static_cast<FavoriteMacroWidget*>(lv_event_get_user_data(e));
-            if (self) {
-                // Clean up heap-allocated strings before LVGL frees the tree
-                lv_obj_t* backdrop = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-                lv_obj_t* macro_list = lv_obj_find_by_name(backdrop, "macro_list");
-                if (macro_list) {
-                    uint32_t count = lv_obj_get_child_count(macro_list);
-                    for (uint32_t i = 0; i < count; ++i) {
-                        lv_obj_t* row = lv_obj_get_child(macro_list, i);
-                        auto* name_ptr = static_cast<std::string*>(lv_obj_get_user_data(row));
-                        delete name_ptr;
-                        lv_obj_set_user_data(row, nullptr);
-                    }
-                }
-                self->picker_backdrop_ = nullptr;
-                if (s_active_picker_ == self) {
-                    s_active_picker_ = nullptr;
-                }
+            if (!self)
+                return;
+            auto* backdrop = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+            cleanup_picker_row_strings(backdrop);
+            self->picker_backdrop_ = nullptr;
+            if (s_active_picker_ == self) {
+                s_active_picker_ = nullptr;
             }
         },
         LV_EVENT_DELETE, this);
@@ -554,16 +431,7 @@ void FavoriteMacroWidget::dismiss_macro_picker() {
     // Clean up heap-allocated macro name strings (only if object is still valid —
     // parent screen deletion auto-frees children, leaving stale pointers)
     if (lv_obj_is_valid(picker_backdrop_)) {
-        lv_obj_t* macro_list = lv_obj_find_by_name(picker_backdrop_, "macro_list");
-        if (macro_list) {
-            uint32_t count = lv_obj_get_child_count(macro_list);
-            for (uint32_t i = 0; i < count; ++i) {
-                lv_obj_t* row = lv_obj_get_child(macro_list, i);
-                auto* name_ptr = static_cast<std::string*>(lv_obj_get_user_data(row));
-                delete name_ptr;
-                lv_obj_set_user_data(row, nullptr);
-            }
-        }
+        cleanup_picker_row_strings(picker_backdrop_);
     }
 
     helix::ui::safe_delete(picker_backdrop_);
@@ -574,8 +442,6 @@ void FavoriteMacroWidget::dismiss_macro_picker() {
 
 void FavoriteMacroWidget::select_macro(const std::string& name) {
     macro_name_ = name;
-    params_cached_ = false; // Invalidate param cache for new macro
-    cached_params_.clear();
 
     update_display();
     save_config();
@@ -587,17 +453,8 @@ void FavoriteMacroWidget::select_macro(const std::string& name) {
 // Static event callbacks
 // ============================================================================
 
-void FavoriteMacroWidget::clicked_1_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] clicked_1_cb");
-    auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
-    if (widget) {
-        widget->handle_clicked();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void FavoriteMacroWidget::clicked_2_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] clicked_2_cb");
+void FavoriteMacroWidget::clicked_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] clicked_cb");
     auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
     if (widget) {
         widget->handle_clicked();

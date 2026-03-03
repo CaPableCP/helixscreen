@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "macro_param_cache.h"
+#include "macro_param_modal.h"
 #include "ui_observer_guard.h"
 
 #include "panel_widget.h"
@@ -16,32 +18,28 @@ class MoonrakerAPI;
 
 namespace helix {
 
-/// Parsed macro parameter with optional default value
-struct MacroParam {
-    std::string name;          ///< Parameter name (uppercase, e.g., "EXTRUDER_TEMP")
-    std::string default_value; ///< Default value from |default(VALUE), empty if none
-};
-
-/// Parse macro parameters from a Klipper gcode_macro template.
-/// Detects params.NAME, params['NAME'], params["NAME"] references and
-/// extracts |default(VALUE) when present. Deduplicates by name.
-[[nodiscard]] std::vector<MacroParam> parse_macro_params(const std::string& gcode_template);
+static constexpr int kMaxFavoriteMacroSlots = 5;
 
 /// Home panel widget for one-tap macro execution.
-/// Two instances registered: favorite_macro_1 and favorite_macro_2.
+/// Up to kMaxFavoriteMacroSlots instances registered: favorite_macro_1 through _5.
+/// All share a single XML component and catalog entry via catalog_group.
 /// Tap executes assigned macro; configure button opens macro picker.
 /// When unconfigured, tap also opens picker.
 class FavoriteMacroWidget : public PanelWidget {
   public:
-    /// @param widget_id "favorite_macro_1" or "favorite_macro_2"
+    /// @param widget_id "favorite_macro_1" through "favorite_macro_5"
     explicit FavoriteMacroWidget(const std::string& widget_id);
     ~FavoriteMacroWidget() override;
 
+    void set_config(const nlohmann::json& config) override;
     void attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) override;
     void detach() override;
     void on_size_changed(int colspan, int rowspan, int width_px, int height_px) override;
     bool has_edit_configure() const override { return true; }
     bool on_edit_configure() override;
+    std::string get_component_name() const override {
+        return "panel_widget_favorite_macro";
+    }
     const char* id() const override {
         return widget_id_.c_str();
     }
@@ -50,12 +48,11 @@ class FavoriteMacroWidget : public PanelWidget {
     void handle_clicked();
 
     // Static event callbacks (XML-registered)
-    static void clicked_1_cb(lv_event_t* e);
-    static void clicked_2_cb(lv_event_t* e);
+    static void clicked_cb(lv_event_t* e);
     static void picker_backdrop_cb(lv_event_t* e);
 
   private:
-    std::string widget_id_; ///< "favorite_macro_1" or "favorite_macro_2"
+    std::string widget_id_; ///< "favorite_macro_1" through "favorite_macro_5"
 
     lv_obj_t* widget_obj_ = nullptr;
     lv_obj_t* parent_screen_ = nullptr;
@@ -63,9 +60,6 @@ class FavoriteMacroWidget : public PanelWidget {
     lv_obj_t* name_label_ = nullptr;
 
     std::string macro_name_;                ///< Assigned macro (e.g., "CLEAN_NOZZLE")
-    std::vector<MacroParam> cached_params_; ///< Cached parsed parameters
-    bool params_cached_ = false;            ///< Whether params have been fetched
-
     std::shared_ptr<bool> alive_ = std::make_shared<bool>(false);
 
     // Picker context menu
@@ -74,7 +68,6 @@ class FavoriteMacroWidget : public PanelWidget {
     MoonrakerAPI* get_api() const;
 
     void update_display();
-    void load_config();
     void save_config();
 
     void fetch_and_execute();
