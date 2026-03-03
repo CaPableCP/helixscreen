@@ -25,6 +25,7 @@ Applied in order. The fbdev patches have a dependency: `stride_bpp` must be appl
 | `lvgl-drm-egl-getters.patch` | `lv_linux_drm.h`, `lv_linux_drm_egl.c` | EGL display/context/config getters |
 | `lvgl_refr_reshape_null_guard.patch` | `lv_refr.c` | NULL guard on draw_buf reshape failure to prevent buffer overrun (#229) |
 | `lvgl-evdev-protocol-a.patch` | `lv_evdev.c` | Protocol A touch release synthesis + phantom slot bounds fix for Goodix GT9xx |
+| `lvgl_arc_draw_guard.patch` | `lv_draw_arc.c`, `lv_arc.c` | Guard against negative inner radius and zero-radius arc invalidation crashes |
 
 ## Dropped Patches (v9.5.0)
 

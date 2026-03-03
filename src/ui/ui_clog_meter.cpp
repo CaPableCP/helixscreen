@@ -419,6 +419,12 @@ void UiClogMeter::update_peak_marker(int peak) {
     // 5° wide marker centered on peak position
     int start = (angle - 2 + 360) % 360;
     int end = (angle + 2) % 360;
+
+    // Guard against zero-sweep arc (start == end) which can crash the SW renderer
+    if (start == end) {
+        end = (start + 1) % 360;
+    }
+
     lv_arc_set_angles(peak_arc_, static_cast<uint16_t>(start),
                       static_cast<uint16_t>(end));
 
