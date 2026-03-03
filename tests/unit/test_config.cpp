@@ -1633,19 +1633,19 @@ TEST_CASE_METHOD(ConfigTestFixture,
 }
 
 // ============================================================================
-// v2→v3 migration: Multi-printer support
+// v3→v4 migration: Multi-printer support
 // ============================================================================
 
-TEST_CASE("Config: v2→v3 migration restructures single printer to multi-printer",
-          "[core][config][migration][v3]") {
-    std::string temp_dir = "/tmp/helix_test_v2_to_v3";
+TEST_CASE("Config: v3→v4 migration restructures single printer to multi-printer",
+          "[core][config][migration][v4]") {
+    std::string temp_dir = "/tmp/helix_test_v3_to_v4";
     std::filesystem::remove_all(temp_dir);
     std::filesystem::create_directories(temp_dir);
     std::string temp_path = temp_dir + "/test_config.json";
 
-    // Write a v2 config with single /printer section
-    json v2_config = {
-        {"config_version", 2},
+    // Write a v3 config with single /printer section (pre-multi-printer schema)
+    json v3_config = {
+        {"config_version", 3},
         {"dark_mode", true},
         {"wizard_completed", true},
         {"printer",
@@ -1660,13 +1660,13 @@ TEST_CASE("Config: v2→v3 migration restructures single printer to multi-printe
 
     {
         std::ofstream o(temp_path);
-        o << v2_config.dump(2);
+        o << v3_config.dump(2);
     }
 
     Config test_config;
     test_config.init(temp_path);
 
-    // Should have migrated to v3
+    // Should have migrated to v4
     REQUIRE(test_config.get<int>("/config_version") == CURRENT_CONFIG_VERSION);
 
     // /printer should be gone, /printers should exist
@@ -1698,19 +1698,19 @@ TEST_CASE("Config: v2→v3 migration restructures single printer to multi-printe
     std::filesystem::remove_all(temp_dir);
 }
 
-TEST_CASE("Config: v2→v3 migration uses 'default' when printer has no name",
-          "[core][config][migration][v3]") {
-    std::string temp_dir = "/tmp/helix_test_v2_to_v3_noname";
+TEST_CASE("Config: v3→v4 migration uses 'default' when printer has no name",
+          "[core][config][migration][v4]") {
+    std::string temp_dir = "/tmp/helix_test_v3_to_v4_noname";
     std::filesystem::remove_all(temp_dir);
     std::filesystem::create_directories(temp_dir);
     std::string temp_path = temp_dir + "/test_config.json";
 
-    json v2_config = {{"config_version", 2},
+    json v3_config = {{"config_version", 3},
                       {"printer", {{"moonraker_host", "10.0.0.5"}, {"moonraker_port", 7125}}}};
 
     {
         std::ofstream o(temp_path);
-        o << v2_config.dump(2);
+        o << v3_config.dump(2);
     }
 
     Config test_config;
@@ -1722,8 +1722,8 @@ TEST_CASE("Config: v2→v3 migration uses 'default' when printer has no name",
     std::filesystem::remove_all(temp_dir);
 }
 
-TEST_CASE("Config: v2→v3 migration skips if /printers already exists",
-          "[core][config][migration][v3]") {
+TEST_CASE("Config: v3→v4 migration skips if /printers already exists",
+          "[core][config][migration][v4]") {
     std::string temp_dir = "/tmp/helix_test_v3_skip";
     std::filesystem::remove_all(temp_dir);
     std::filesystem::create_directories(temp_dir);

@@ -19,7 +19,7 @@
 namespace helix {
 namespace wizard {
 // Printer identification
-constexpr const char* PRINTER_NAME = "name";
+constexpr const char* PRINTER_NAME = "printer_name";
 constexpr const char* PRINTER_TYPE = "type";
 
 // Bed hardware

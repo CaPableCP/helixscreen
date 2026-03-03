@@ -272,6 +272,60 @@ static void migrate_v2_to_v3(json& config) {
     }
 }
 
+/// Migration v3→v4: Restructure single /printer to multi-printer /printers map.
+/// Moves the old singular "printer" object under "printers/{slug}/" and sets active_printer_id.
+/// Also moves root-level "filament", "panel_widgets" under the printer entry.
+static void migrate_v3_to_v4(json& config) {
+    // Skip if already has /printers (idempotent)
+    if (config.contains("printers")) {
+        return;
+    }
+
+    // Skip if no old /printer section exists
+    if (!config.contains("printer") || !config["printer"].is_object()) {
+        return;
+    }
+
+    json printer_data = config["printer"];
+
+    // Determine the slug ID from the printer name
+    std::string printer_name;
+    if (printer_data.contains("printer_name") && printer_data["printer_name"].is_string()) {
+        printer_name = printer_data["printer_name"].get<std::string>();
+    } else if (printer_data.contains("name") && printer_data["name"].is_string()) {
+        printer_name = printer_data["name"].get<std::string>();
+    }
+    std::string slug = printer_name.empty() ? "default" : Config::slugify(printer_name);
+    if (slug.empty()) {
+        slug = "default";
+    }
+
+    // Move root-level per-printer sections into the printer entry
+    if (config.contains("filament") && config["filament"].is_object()) {
+        printer_data["filament"] = config["filament"];
+        config.erase("filament");
+    }
+    if (config.contains("panel_widgets") && config["panel_widgets"].is_object()) {
+        printer_data["panel_widgets"] = config["panel_widgets"];
+        config.erase("panel_widgets");
+    }
+
+    // Copy root-level wizard_completed into the printer entry
+    if (config.contains("wizard_completed")) {
+        printer_data["wizard_completed"] = config["wizard_completed"];
+        // Keep root-level for backward compatibility
+    }
+
+    // Create the new printers map and set the active printer
+    config["printers"] = {{slug, printer_data}};
+    config["active_printer_id"] = slug;
+
+    // Remove the old singular "printer" key
+    config.erase("printer");
+
+    spdlog::info("[Config] Migration v4: restructured /printer to /printers/{}", slug);
+}
+
 /// Run all versioned migrations in sequence from current version to CURRENT_CONFIG_VERSION
 static void run_versioned_migrations(json& config) {
     int version = 0;
@@ -285,6 +339,8 @@ static void run_versioned_migrations(json& config) {
         migrate_v1_to_v2(config);
     if (version < 3)
         migrate_v2_to_v3(config);
+    if (version < 4)
+        migrate_v3_to_v4(config);
 
     config["config_version"] = CURRENT_CONFIG_VERSION;
 }
