@@ -7,10 +7,8 @@
 #include "config.h"
 #include "printer_state.h"
 #include "static_panel_registry.h"
-#include "theme_manager.h"
 #include "ui_callback_helpers.h"
 #include "ui_event_safety.h"
-#include "ui_icon_codepoints.h"
 #include "ui_modal.h"
 #include "ui_nav_manager.h"
 #include "ui_update_queue.h"
@@ -47,6 +45,8 @@ void PrinterListOverlay::register_callbacks() {
 
     register_xml_callbacks({
         {"printer_list_add_cb", on_add_printer_cb},
+        {"printer_list_row_cb", on_printer_row_cb},
+        {"printer_list_delete_cb", on_delete_printer_cb},
     });
 
     s_callbacks_registered_ = true;
@@ -101,7 +101,6 @@ void PrinterListOverlay::on_activate() {
 }
 
 void PrinterListOverlay::on_deactivate() {
-    cleanup_row_user_data();
     OverlayBase::on_deactivate();
 }
 
@@ -126,121 +125,46 @@ void PrinterListOverlay::populate_printer_list() {
     }
 
     // Clean existing children before repopulating
-    cleanup_row_user_data();
     lv_obj_clean(container);
-
-    // Resolve spacing tokens
-    auto get_token = [](const char* name, int fallback) {
-        const char* s = lv_xml_get_const(nullptr, name);
-        return s ? std::atoi(s) : fallback;
-    };
-    int space_sm = get_token("space_sm", 6);
-    int space_xs = get_token("space_xs", 4);
-
-    // Resolve colors
-    lv_color_t accent = theme_manager_get_color("accent");
-    lv_color_t text_color = theme_manager_get_color("text");
-    lv_color_t success_color = theme_manager_get_color("success");
-    lv_color_t danger_color = theme_manager_get_color("danger");
-
-    // Resolve fonts via XML token system
-    const char* body_font_name = lv_xml_get_const(nullptr, "font_body");
-    const lv_font_t* body_font =
-        body_font_name ? lv_xml_get_font(nullptr, body_font_name) : lv_font_get_default();
-    const char* icon_font_name = lv_xml_get_const(nullptr, "icon_font_sm");
-    const lv_font_t* icon_font =
-        icon_font_name ? lv_xml_get_font(nullptr, icon_font_name) : body_font;
-
-    // Get icon codepoints
-    const char* check_codepoint = ui_icon::lookup_codepoint("check");
-    const char* delete_codepoint = ui_icon::lookup_codepoint("delete");
 
     for (const auto& id : printer_ids) {
         bool is_active = (id == active_id);
         std::string name = cfg->get<std::string>("/printers/" + id + "/printer_name", id);
 
-        // Row container
-        lv_obj_t* row = lv_obj_create(container);
-        lv_obj_set_width(row, LV_PCT(100));
-        lv_obj_set_height(row, LV_SIZE_CONTENT);
-        lv_obj_set_style_pad_all(row, space_sm, 0);
-        lv_obj_set_style_pad_gap(row, space_xs, 0);
-        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
-                              LV_FLEX_ALIGN_CENTER);
-        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
-
-        // Pressed state styling
-        lv_obj_set_style_bg_opa(row, 30, LV_STATE_PRESSED);
-        lv_obj_set_style_bg_color(row, accent, LV_STATE_PRESSED);
-
-        // Checkmark icon (active) or spacer (inactive)
-        lv_obj_t* indicator = lv_label_create(row);
-        if (is_active && check_codepoint) {
-            lv_label_set_text(indicator, check_codepoint);
-            lv_obj_set_style_text_font(indicator, icon_font, 0);
-            lv_obj_set_style_text_color(indicator, accent, 0);
-        } else {
-            lv_label_set_text(indicator, "");
-            lv_obj_set_style_min_width(indicator, 16, 0);
-            lv_obj_set_style_text_font(indicator, icon_font, 0);
+        // Create row from XML component
+        auto* row = static_cast<lv_obj_t*>(
+            lv_xml_create(container, "printer_list_item", nullptr));
+        if (!row) {
+            spdlog::warn("[{}] Failed to create printer_list_item for '{}'", get_name(), id);
+            continue;
         }
-        lv_obj_remove_flag(indicator, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_flag(indicator, LV_OBJ_FLAG_EVENT_BUBBLE);
 
-        // Printer name label
-        lv_obj_t* label = lv_label_create(row);
-        lv_label_set_text(label, name.c_str());
-        lv_obj_set_flex_grow(label, 1);
-        lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
-        lv_obj_set_style_text_font(label, body_font, 0);
-        lv_obj_set_style_text_color(label, text_color, 0);
-        lv_obj_remove_flag(label, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_flag(label, LV_OBJ_FLAG_EVENT_BUBBLE);
+        // Tag with printer ID so callbacks can identify it
+        lv_obj_set_name(row, id.c_str());
 
-        // Connection status dot (8x8 circle)
-        lv_obj_t* dot = lv_obj_create(row);
-        lv_obj_set_size(dot, 8, 8);
-        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(dot, success_color, 0);
-        lv_obj_set_style_bg_opa(dot, 255, 0);
-        lv_obj_set_style_border_width(dot, 0, 0);
-        lv_obj_set_style_pad_all(dot, 0, 0);
-        lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_add_flag(dot, LV_OBJ_FLAG_EVENT_BUBBLE);
-
-        // Delete button
-        lv_obj_t* del_btn = lv_obj_create(row);
-        lv_obj_set_size(del_btn, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_style_bg_opa(del_btn, 0, 0);
-        lv_obj_set_style_border_width(del_btn, 0, 0);
-        lv_obj_set_style_pad_all(del_btn, space_xs, 0);
-        lv_obj_add_flag(del_btn, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag(del_btn, LV_OBJ_FLAG_SCROLLABLE);
-        // Hide delete when only 1 printer
-        if (printer_ids.size() <= 1) {
-            lv_obj_add_flag(del_btn, LV_OBJ_FLAG_HIDDEN);
+        // Set printer name
+        lv_obj_t* name_label = lv_obj_find_by_name(row, "printer_name");
+        if (name_label) {
+            lv_label_set_text(name_label, name.c_str());
         }
-        auto* del_id = new std::string(id);
-        lv_obj_set_user_data(del_btn, del_id);
-        lv_obj_add_event_cb(del_btn, on_delete_printer_cb, LV_EVENT_CLICKED, nullptr);
 
-        // Delete icon inside the button
-        lv_obj_t* del_icon = lv_label_create(del_btn);
-        if (delete_codepoint) {
-            lv_label_set_text(del_icon, delete_codepoint);
+        // Mark active printer with checked state (triggers left border accent style)
+        if (is_active) {
+            lv_obj_add_state(row, LV_STATE_CHECKED);
+            // Show check icon for active printer
+            lv_obj_t* check_icon = lv_obj_find_by_name(row, "active_check");
+            if (check_icon) {
+                lv_obj_set_style_text_opa(check_icon, LV_OPA_COVER, LV_PART_MAIN);
+            }
         }
-        lv_obj_set_style_text_font(del_icon, icon_font, 0);
-        lv_obj_set_style_text_color(del_icon, danger_color, 0);
-        lv_obj_remove_flag(del_icon, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_flag(del_icon, LV_OBJ_FLAG_EVENT_BUBBLE);
 
-        // Store printer ID on the row for switch handler
-        auto* id_copy = new std::string(id);
-        lv_obj_set_user_data(row, id_copy);
-        lv_obj_add_event_cb(row, on_printer_row_cb, LV_EVENT_CLICKED, nullptr);
+        // Show delete button when more than 1 printer
+        if (printer_ids.size() > 1) {
+            lv_obj_t* del_btn = lv_obj_find_by_name(row, "delete_btn");
+            if (del_btn) {
+                lv_obj_remove_flag(del_btn, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
     }
 
     spdlog::debug("[{}] Populated {} printers (active: {})", get_name(), printer_ids.size(),
@@ -257,6 +181,10 @@ void PrinterListOverlay::handle_switch_printer(const std::string& printer_id) {
         return; // Already active
     }
     spdlog::info("[{}] Switching to printer '{}'", get_name(), printer_id);
+
+    // Dismiss this overlay before soft restart tears down the UI
+    NavigationManager::instance().go_back();
+
     NavigationManager::instance().trigger_printer_switch(printer_id);
 }
 
@@ -280,43 +208,37 @@ void PrinterListOverlay::handle_delete_printer(const std::string& printer_id) {
 
 void PrinterListOverlay::handle_add_printer() {
     spdlog::info("[{}] Add printer requested", get_name());
+
+    // Dismiss this overlay before soft restart into wizard
+    NavigationManager::instance().go_back();
+
     NavigationManager::instance().trigger_add_printer();
 }
 
 // =============================================================================
-// Cleanup
+// Helpers
 // =============================================================================
 
-void PrinterListOverlay::cleanup_row_user_data() {
-    if (!overlay_root_) {
-        return;
-    }
-
-    lv_obj_t* container = lv_obj_find_by_name(overlay_root_, "printer_list_container");
-    if (!container) {
-        return;
-    }
-
-    uint32_t count = lv_obj_get_child_count(container);
-    for (uint32_t i = 0; i < count; ++i) {
-        lv_obj_t* row = lv_obj_get_child(container, i);
-
-        // Clean row user_data (printer ID for switch)
-        auto* row_id = static_cast<std::string*>(lv_obj_get_user_data(row));
-        delete row_id;
-        lv_obj_set_user_data(row, nullptr);
-
-        // Clean delete button user_data within the row
-        uint32_t child_count = lv_obj_get_child_count(row);
-        for (uint32_t j = 0; j < child_count; ++j) {
-            lv_obj_t* child = lv_obj_get_child(row, j);
-            auto* child_id = static_cast<std::string*>(lv_obj_get_user_data(child));
-            if (child_id) {
-                delete child_id;
-                lv_obj_set_user_data(child, nullptr);
+/// Walk up the parent chain to find the printer_list_item row.
+/// The row is the child of "printer_list_container" and has the printer ID as its name.
+static std::string find_printer_id_from_event(lv_event_t* e) {
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    lv_obj_t* obj = target;
+    while (obj) {
+        lv_obj_t* parent = lv_obj_get_parent(obj);
+        if (parent) {
+            const char* parent_name = lv_obj_get_name(parent);
+            if (parent_name && std::string_view(parent_name) == "printer_list_container") {
+                // obj is a direct child of the container — it's the row
+                const char* row_name = lv_obj_get_name(obj);
+                if (row_name && row_name[0] != '\0') {
+                    return std::string(row_name);
+                }
             }
         }
+        obj = parent;
     }
+    return {};
 }
 
 // =============================================================================
@@ -332,26 +254,13 @@ void PrinterListOverlay::on_add_printer_cb(lv_event_t* /*e*/) {
 void PrinterListOverlay::on_printer_row_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrinterListOverlay] on_printer_row_cb");
 
-    // Walk up parent chain to find the row with user_data
-    // (click target may be a child label due to event bubbling)
-    auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    std::string* id_ptr = nullptr;
-    lv_obj_t* obj = target;
-    while (obj) {
-        id_ptr = static_cast<std::string*>(lv_obj_get_user_data(obj));
-        if (id_ptr) {
-            break;
-        }
-        obj = lv_obj_get_parent(obj);
-    }
-
-    if (!id_ptr) {
+    std::string id = find_printer_id_from_event(e);
+    if (id.empty()) {
         spdlog::warn("[PrinterListOverlay] Row click with no printer ID");
         return;
     }
 
-    std::string selected_id = *id_ptr;
-    get_printer_list_overlay().handle_switch_printer(selected_id);
+    get_printer_list_overlay().handle_switch_printer(id);
 
     LVGL_SAFE_EVENT_CB_END();
 }
@@ -359,25 +268,13 @@ void PrinterListOverlay::on_printer_row_cb(lv_event_t* e) {
 void PrinterListOverlay::on_delete_printer_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrinterListOverlay] on_delete_printer_cb");
 
-    // Walk up to find the delete button with user_data
-    auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    std::string* id_ptr = nullptr;
-    lv_obj_t* obj = target;
-    while (obj) {
-        id_ptr = static_cast<std::string*>(lv_obj_get_user_data(obj));
-        if (id_ptr) {
-            break;
-        }
-        obj = lv_obj_get_parent(obj);
-    }
-
-    if (!id_ptr) {
+    std::string id = find_printer_id_from_event(e);
+    if (id.empty()) {
         spdlog::warn("[PrinterListOverlay] Delete click with no printer ID");
         return;
     }
 
-    std::string printer_id = *id_ptr;
-    get_printer_list_overlay().handle_delete_printer(printer_id);
+    get_printer_list_overlay().handle_delete_printer(id);
 
     LVGL_SAFE_EVENT_CB_END();
 }
@@ -390,6 +287,12 @@ void PrinterListOverlay::on_delete_confirm_cb(lv_event_t* e) {
         return;
     }
 
+    // Close the modal first
+    lv_obj_t* top = Modal::get_top();
+    if (top) {
+        Modal::hide(top);
+    }
+
     auto* cfg = Config::get_instance();
     if (cfg) {
         bool was_active = (*id_ptr == cfg->get_active_printer_id());
@@ -398,9 +301,14 @@ void PrinterListOverlay::on_delete_confirm_cb(lv_event_t* e) {
         cfg->save();
 
         if (was_active) {
+            // Defer switch out of modal callback — soft restart tears down UI
             auto remaining = cfg->get_printer_ids();
             if (!remaining.empty()) {
-                NavigationManager::instance().trigger_printer_switch(remaining.front());
+                std::string next_id = remaining.front();
+                helix::ui::queue_update([next_id]() {
+                    NavigationManager::instance().go_back();  // dismiss overlay
+                    NavigationManager::instance().trigger_printer_switch(next_id);
+                });
             }
         } else {
             // Defer repopulation out of modal callback to avoid widget mutation mid-event
@@ -422,6 +330,13 @@ void PrinterListOverlay::on_delete_confirm_cb(lv_event_t* e) {
 
 void PrinterListOverlay::on_delete_cancel_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrinterListOverlay] on_delete_cancel_cb");
+
+    // Close the modal
+    lv_obj_t* top = Modal::get_top();
+    if (top) {
+        Modal::hide(top);
+    }
+
     auto* id_ptr = static_cast<std::string*>(lv_event_get_user_data(e));
     delete id_ptr;
     LVGL_SAFE_EVENT_CB_END();

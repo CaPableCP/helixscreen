@@ -30,7 +30,6 @@ class PrinterListOverlay : public OverlayBase {
 
   private:
     void populate_printer_list();
-    void cleanup_row_user_data();
 
     static bool s_callbacks_registered_;
 
