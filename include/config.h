@@ -122,7 +122,7 @@ class Config {
      */
     template <typename T> T get(const std::string& json_ptr, const T& default_value) {
         json::json_pointer ptr(json_ptr);
-        if (data.contains(ptr)) {
+        if (data.contains(ptr) && !data[ptr].is_null()) {
             return data[ptr].template get<T>();
         }
         return default_value;
