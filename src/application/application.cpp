@@ -2305,8 +2305,8 @@ int Application::main_loop() {
             last_fb_selfheal_tick = current_tick;
         }
 
-        // Run LVGL tasks
-        lv_timer_handler();
+        // Run LVGL tasks — returns ms until next timer needs to fire
+        uint32_t time_till_next = lv_timer_handler();
 
         // Signal splash to exit when discovery completes (or timeout)
         m_splash_manager.check_and_signal();
@@ -2350,7 +2350,15 @@ int Application::main_loop() {
             }
         }
 
-        DisplayManager::delay(5);
+        // Sleep adaptively: use LVGL's hint for when next work is due,
+        // capped to keep UI responsive. In benchmark mode, minimize delay.
+        if (!loop_config.benchmark_mode) {
+            uint32_t sleep_ms = std::min(time_till_next, static_cast<uint32_t>(33));
+            if (sleep_ms < 5) sleep_ms = 5;
+            DisplayManager::delay(sleep_ms);
+        } else {
+            DisplayManager::delay(1);
+        }
     }
 
     m_running = false;
