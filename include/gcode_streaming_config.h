@@ -70,6 +70,20 @@ size_t calculate_streaming_threshold(size_t available_memory_kb, int threshold_p
  */
 bool should_use_gcode_streaming(size_t file_size_bytes);
 
+struct MemoryInfo; // forward declaration
+
+/**
+ * @brief Testable overload that accepts explicit memory info
+ *
+ * Used by unit tests to inject specific memory configurations without
+ * depending on the real system memory state.
+ *
+ * @param file_size_bytes Size of the G-code file
+ * @param mem System memory information
+ * @return true if streaming should be used
+ */
+bool should_use_gcode_streaming(size_t file_size_bytes, const MemoryInfo& mem);
+
 /**
  * @brief Get human-readable description of current streaming config
  *

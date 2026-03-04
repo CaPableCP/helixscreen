@@ -60,8 +60,9 @@ struct MemoryInfo {
     size_t free_kb = 0;      ///< Strictly free memory in KB
 
     // RAM tier thresholds (total system RAM)
-    static constexpr size_t TIER_CONSTRAINED_KB = 256 * 1024; ///< < 256MB = constrained
-    static constexpr size_t TIER_NORMAL_KB = 512 * 1024;      ///< < 512MB = normal
+    static constexpr size_t TIER_CONSTRAINED_KB = 256 * 1024;          ///< < 256MB = constrained
+    static constexpr size_t TIER_NORMAL_KB = 512 * 1024;               ///< < 512MB = normal
+    static constexpr size_t TIER_FORCE_STREAMING_KB = 4ULL * 1024 * 1024; ///< <= 4GB = force streaming
 
     /// Check if available memory is low (< 64MB available right now)
     bool is_low_memory() const {
@@ -81,6 +82,11 @@ struct MemoryInfo {
     /// Device tier: good (> 512MB total) - Desktop, Pi 4 2GB+
     bool is_good_device() const {
         return total_kb >= TIER_NORMAL_KB;
+    }
+
+    /// Should force G-code streaming mode (total RAM <= 4GB)
+    bool should_force_streaming() const {
+        return total_kb > 0 && total_kb <= TIER_FORCE_STREAMING_KB;
     }
 
     /// Get total memory in MB

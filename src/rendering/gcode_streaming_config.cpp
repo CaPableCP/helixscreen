@@ -78,6 +78,35 @@ size_t calculate_streaming_threshold(size_t available_memory_kb, int threshold_p
     return max_file_size;
 }
 
+bool should_use_gcode_streaming(size_t file_size_bytes, const MemoryInfo& mem) {
+    // Force streaming on low-RAM devices (<=4GB total)
+    if (mem.should_force_streaming()) {
+        spdlog::debug("[GCodeStreaming] Low-RAM device ({}MB) - forcing streaming",
+                      mem.total_kb / 1024);
+        return true;
+    }
+
+    // If we can't read memory info, be conservative
+    if (mem.available_kb == 0) {
+        spdlog::warn("[GCodeStreaming] Cannot read memory info, defaulting to streaming "
+                     "for files > 2MB");
+        return file_size_bytes > (2 * 1024 * 1024);
+    }
+
+    // Calculate threshold based on available memory
+    int threshold_pct = get_streaming_threshold_percent();
+    size_t threshold_bytes = calculate_streaming_threshold(mem.available_kb, threshold_pct);
+
+    bool should_stream = file_size_bytes > threshold_bytes;
+
+    spdlog::trace("[GCodeStreaming] AUTO decision: {}KB file {} {}KB threshold ({}MB RAM, "
+                  "{}%)",
+                  file_size_bytes / 1024, should_stream ? ">" : "<=", threshold_bytes / 1024,
+                  mem.available_kb / 1024, threshold_pct);
+
+    return should_stream;
+}
+
 bool should_use_gcode_streaming(size_t file_size_bytes) {
     GCodeStreamingMode mode = get_gcode_streaming_mode();
 
@@ -93,28 +122,8 @@ bool should_use_gcode_streaming(size_t file_size_bytes) {
         return false;
 
     case GCodeStreamingMode::AUTO: {
-        // Get system memory info
         MemoryInfo mem = get_system_memory_info();
-
-        // If we can't read memory info, be conservative
-        if (mem.available_kb == 0) {
-            spdlog::warn("[GCodeStreaming] Cannot read memory info, defaulting to streaming "
-                         "for files > 2MB");
-            return file_size_bytes > (2 * 1024 * 1024);
-        }
-
-        // Calculate threshold based on available memory
-        int threshold_pct = get_streaming_threshold_percent();
-        size_t threshold_bytes = calculate_streaming_threshold(mem.available_kb, threshold_pct);
-
-        bool should_stream = file_size_bytes > threshold_bytes;
-
-        spdlog::trace("[GCodeStreaming] AUTO decision: {}KB file {} {}KB threshold ({}MB RAM, "
-                      "{}%)",
-                      file_size_bytes / 1024, should_stream ? ">" : "<=", threshold_bytes / 1024,
-                      mem.available_kb / 1024, threshold_pct);
-
-        return should_stream;
+        return should_use_gcode_streaming(file_size_bytes, mem);
     }
     }
 
