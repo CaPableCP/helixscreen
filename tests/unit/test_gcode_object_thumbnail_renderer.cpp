@@ -41,7 +41,7 @@ ParsedGCodeFile make_single_object_gcode(const std::string& name = "cube1") {
     seg.start = glm::vec3(10.0f, 50.0f, 0.2f);
     seg.end = glm::vec3(90.0f, 50.0f, 0.2f);
     seg.is_extrusion = true;
-    seg.object_name = name;
+    seg.object_name_index = gcode.intern_object_name(name);
     layer.segments.push_back(seg);
 
     // Another segment: vertical line
@@ -49,7 +49,7 @@ ParsedGCodeFile make_single_object_gcode(const std::string& name = "cube1") {
     seg2.start = glm::vec3(50.0f, 20.0f, 0.2f);
     seg2.end = glm::vec3(50.0f, 80.0f, 0.2f);
     seg2.is_extrusion = true;
-    seg2.object_name = name;
+    seg2.object_name_index = gcode.intern_object_name(name);
     layer.segments.push_back(seg2);
 
     layer.bounding_box.expand(glm::vec3(10.0f, 20.0f, 0.2f));
@@ -92,7 +92,7 @@ ParsedGCodeFile make_multi_object_gcode() {
         seg.start = glm::vec3(x0, y0, 0.2f);
         seg.end = glm::vec3(x1, y1, 0.2f);
         seg.is_extrusion = true;
-        seg.object_name = obj_name;
+        seg.object_name_index = gcode.intern_object_name(obj_name);
         layer.segments.push_back(seg);
     };
 
@@ -322,7 +322,7 @@ TEST_CASE("GCodeObjectThumbnailRenderer: segments without object_name are skippe
     named.start = glm::vec3(20.0f, 20.0f, 0.2f);
     named.end = glm::vec3(80.0f, 80.0f, 0.2f);
     named.is_extrusion = true;
-    named.object_name = "my_obj";
+    named.object_name_index = gcode.intern_object_name("my_obj");
     layer.segments.push_back(named);
 
     gcode.layers.push_back(std::move(layer));
@@ -352,7 +352,7 @@ TEST_CASE("GCodeObjectThumbnailRenderer: travel moves are skipped", "[object-thu
     travel.start = glm::vec3(10.0f, 10.0f, 0.2f);
     travel.end = glm::vec3(90.0f, 90.0f, 0.2f);
     travel.is_extrusion = false; // travel!
-    travel.object_name = "obj";
+    travel.object_name_index = gcode.intern_object_name("obj");
     layer.segments.push_back(travel);
 
     gcode.layers.push_back(std::move(layer));
@@ -457,7 +457,7 @@ TEST_CASE("GCodeObjectThumbnailRenderer: multiple layers are rendered", "[object
         seg.start = glm::vec3(10.0f + i * 5.0f, 10.0f, layer.z_height);
         seg.end = glm::vec3(90.0f - i * 5.0f, 90.0f, layer.z_height);
         seg.is_extrusion = true;
-        seg.object_name = "tall_part";
+        seg.object_name_index = gcode.intern_object_name("tall_part");
         layer.segments.push_back(seg);
         layer.segment_count_extrusion = 1;
 

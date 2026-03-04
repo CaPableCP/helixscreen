@@ -588,23 +588,26 @@ void GCodeLayerRenderer::render_layers_to_cache(int from_layer, int to_layer) {
             }
 
             // Override color for excluded/highlighted objects
-            if (!seg.object_name.empty()) {
-                if (excluded_objects_.count(seg.object_name) > 0) {
-                    // Excluded: orange-red with reduced alpha
-                    r = kExcludedR;
-                    g = kExcludedG;
-                    b = kExcludedB;
-                    uint32_t color =
-                        (static_cast<uint32_t>(kExcludedAlpha) << 24) | (r << 16) | (g << 8) | b;
-                    draw_thick_line_bresenham_solid(p1.x, p1.y, p2.x, p2.y, color, line_width);
-                    ++segments_rendered;
-                    continue;
-                }
-                if (highlighted_objects_.count(seg.object_name) > 0) {
-                    // Highlighted: selection blue, full alpha
-                    r = kHighlightedR;
-                    g = kHighlightedG;
-                    b = kHighlightedB;
+            if (seg.object_name_index >= 0) {
+                const std::string& obj_name = resolve_object_name(seg.object_name_index);
+                if (!obj_name.empty()) {
+                    if (excluded_objects_.count(obj_name) > 0) {
+                        // Excluded: orange-red with reduced alpha
+                        r = kExcludedR;
+                        g = kExcludedG;
+                        b = kExcludedB;
+                        uint32_t color =
+                            (static_cast<uint32_t>(kExcludedAlpha) << 24) | (r << 16) | (g << 8) | b;
+                        draw_thick_line_bresenham_solid(p1.x, p1.y, p2.x, p2.y, color, line_width);
+                        ++segments_rendered;
+                        continue;
+                    }
+                    if (highlighted_objects_.count(obj_name) > 0) {
+                        // Highlighted: selection blue, full alpha
+                        r = kHighlightedR;
+                        g = kHighlightedG;
+                        b = kHighlightedB;
+                    }
                 }
             }
 
@@ -997,9 +1000,9 @@ void GCodeLayerRenderer::render_segment(lv_layer_t* layer, const ToolpathSegment
     }
 
     // Check excluded/highlighted state for width/opacity
-    bool is_excluded = !seg.object_name.empty() && excluded_objects_.count(seg.object_name) > 0;
-    bool is_highlighted =
-        !seg.object_name.empty() && highlighted_objects_.count(seg.object_name) > 0;
+    const std::string& seg_obj_name = resolve_object_name(seg.object_name_index);
+    bool is_excluded = !seg_obj_name.empty() && excluded_objects_.count(seg_obj_name) > 0;
+    bool is_highlighted = !seg_obj_name.empty() && highlighted_objects_.count(seg_obj_name) > 0;
 
     if (is_excluded) {
         dsc.width = 1;
@@ -1050,9 +1053,21 @@ glm::ivec2 GCodeLayerRenderer::world_to_screen(float x, float y, float z) const 
     return {raw.x + widget_offset_x_, raw.y + widget_offset_y_};
 }
 
+const std::string& GCodeLayerRenderer::resolve_object_name(int16_t index) const {
+    static const std::string empty;
+    if (index < 0) return empty;
+    if (gcode_) {
+        return gcode_->get_object_name(index);
+    }
+    if (streaming_controller_) {
+        return streaming_controller_->get_object_name(index);
+    }
+    return empty;
+}
+
 bool GCodeLayerRenderer::is_support_segment(const ToolpathSegment& seg) const {
     // Support detection via object name (from EXCLUDE_OBJECT metadata)
-    if (seg.object_name.empty()) {
+    if (seg.object_name_index < 0) {
         return false;
     }
 
@@ -1064,7 +1079,7 @@ bool GCodeLayerRenderer::is_support_segment(const ToolpathSegment& seg) const {
     static constexpr const char kSupport[] = "support";
     static constexpr size_t kSupportLen = 7; // strlen("support")
 
-    const std::string& name = seg.object_name;
+    const std::string& name = resolve_object_name(seg.object_name_index);
     if (name.size() < kSupportLen) {
         return false;
     }
@@ -1122,7 +1137,11 @@ std::optional<std::string> GCodeLayerRenderer::pick_object_at(int screen_x, int 
         if (!should_render_segment(seg))
             continue;
 
-        if (seg.object_name.empty())
+        if (seg.object_name_index < 0)
+            continue;
+
+        const std::string& obj_name = resolve_object_name(seg.object_name_index);
+        if (obj_name.empty())
             continue;
 
         // Project segment endpoints to screen space
@@ -1144,7 +1163,7 @@ std::optional<std::string> GCodeLayerRenderer::pick_object_at(int screen_x, int 
 
         if (dist < PICK_THRESHOLD && dist < closest_distance) {
             closest_distance = dist;
-            picked_object = seg.object_name;
+            picked_object = obj_name;
         }
     }
 
@@ -1153,12 +1172,15 @@ std::optional<std::string> GCodeLayerRenderer::pick_object_at(int screen_x, int 
 
 lv_color_t GCodeLayerRenderer::get_segment_color(const ToolpathSegment& seg) const {
     // Check excluded/highlighted state first
-    if (!seg.object_name.empty()) {
-        if (excluded_objects_.count(seg.object_name) > 0) {
-            return lv_color_hex(kExcludedObjectColor);
-        }
-        if (highlighted_objects_.count(seg.object_name) > 0) {
-            return lv_color_hex(kHighlightedObjectColor);
+    if (seg.object_name_index >= 0) {
+        const std::string& obj_name = resolve_object_name(seg.object_name_index);
+        if (!obj_name.empty()) {
+            if (excluded_objects_.count(obj_name) > 0) {
+                return lv_color_hex(kExcludedObjectColor);
+            }
+            if (highlighted_objects_.count(obj_name) > 0) {
+                return lv_color_hex(kHighlightedObjectColor);
+            }
         }
     }
 
@@ -1460,7 +1482,8 @@ void GCodeLayerRenderer::background_ghost_render_thread() {
                 uint8_t tb = tc.blue * kGhostDarkenPercent / 100;
                 seg_color = (255u << 24) | (tr << 16) | (tg << 8) | tb;
             }
-            if (!seg.object_name.empty() && local_excluded.count(seg.object_name) > 0) {
+            const std::string& ghost_obj_name = resolve_object_name(seg.object_name_index);
+            if (!ghost_obj_name.empty() && local_excluded.count(ghost_obj_name) > 0) {
                 // Excluded: dim orange-red
                 uint8_t ex_r = kExcludedR * kGhostDarkenPercent / 100;
                 uint8_t ex_g = kExcludedG * kGhostDarkenPercent / 100;

@@ -366,6 +366,12 @@ void GCodeStreamingController::close() {
         header_metadata_.reset();
     }
 
+    {
+        std::lock_guard<std::mutex> lock(name_table_mutex_);
+        merged_object_name_table_.clear();
+        merged_object_name_lookup_.clear();
+    }
+
     spdlog::debug("[StreamingController] Closed");
 }
 
@@ -576,6 +582,11 @@ std::vector<ToolpathSegment> GCodeStreamingController::load_layer(size_t layer_i
         segments.insert(segments.end(), layer.segments.begin(), layer.segments.end());
     }
 
+    // Remap local object name indices to the merged string table
+    if (!result.object_name_table.empty()) {
+        remap_object_name_indices(segments, result.object_name_table);
+    }
+
     spdlog::debug("[StreamingController] Loaded layer {} ({} segments, {} bytes)", layer_index,
                   segments.size(), bytes.size());
 
@@ -604,6 +615,44 @@ bool GCodeStreamingController::build_index() {
 
 std::function<std::vector<ToolpathSegment>(size_t)> GCodeStreamingController::make_loader() {
     return [this](size_t layer_index) { return load_layer(layer_index); };
+}
+
+const std::string& GCodeStreamingController::get_object_name(int16_t index) const {
+    static const std::string empty;
+    if (index < 0) return empty;
+    std::lock_guard<std::mutex> lock(name_table_mutex_);
+    if (static_cast<size_t>(index) >= merged_object_name_table_.size()) return empty;
+    return merged_object_name_table_[index];
+}
+
+void GCodeStreamingController::remap_object_name_indices(
+    std::vector<ToolpathSegment>& segments,
+    const std::vector<std::string>& local_table) {
+
+    // Build mapping from local indices to merged indices
+    std::lock_guard<std::mutex> lock(name_table_mutex_);
+
+    std::vector<int16_t> local_to_merged(local_table.size());
+    for (size_t i = 0; i < local_table.size(); ++i) {
+        const auto& name = local_table[i];
+        auto it = merged_object_name_lookup_.find(name);
+        if (it != merged_object_name_lookup_.end()) {
+            local_to_merged[i] = it->second;
+        } else {
+            auto idx = static_cast<int16_t>(merged_object_name_table_.size());
+            merged_object_name_table_.push_back(name);
+            merged_object_name_lookup_[name] = idx;
+            local_to_merged[i] = idx;
+        }
+    }
+
+    // Remap all segment indices
+    for (auto& seg : segments) {
+        if (seg.object_name_index >= 0 &&
+            static_cast<size_t>(seg.object_name_index) < local_to_merged.size()) {
+            seg.object_name_index = local_to_merged[static_cast<size_t>(seg.object_name_index)];
+        }
+    }
 }
 
 } // namespace gcode

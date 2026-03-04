@@ -121,12 +121,16 @@ GCodeObjectThumbnailRenderer::render_impl(const ParsedGCodeFile* gcode, int thum
         const auto& layer = gcode->layers[layer_idx];
         for (const auto& seg : layer.segments) {
             // Skip non-extrusion and unnamed segments
-            if (!seg.is_extrusion || seg.object_name.empty()) {
+            if (!seg.is_extrusion || seg.object_name_index < 0) {
                 continue;
             }
 
             // Find the render context for this object
-            auto it = contexts.find(seg.object_name);
+            const std::string& seg_obj_name = gcode->get_object_name(seg.object_name_index);
+            if (seg_obj_name.empty()) {
+                continue;
+            }
+            auto it = contexts.find(seg_obj_name);
             if (it == contexts.end()) {
                 continue;
             }

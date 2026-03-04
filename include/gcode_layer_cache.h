@@ -53,7 +53,7 @@ class GCodeLayerCache {
     static constexpr size_t DEFAULT_BUDGET_GOOD = 32 * 1024 * 1024;
 
     /// Approximate bytes per segment (for estimation)
-    static constexpr size_t BYTES_PER_SEGMENT = 80;
+    static constexpr size_t BYTES_PER_SEGMENT = 40;
 
     /**
      * @brief Construct cache with memory budget

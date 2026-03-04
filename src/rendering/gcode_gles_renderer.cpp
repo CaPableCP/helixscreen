@@ -1694,7 +1694,7 @@ std::optional<std::string> GCodeGLESRenderer::pick_object(const glm::vec2& scree
         for (const auto& segment : layer.segments) {
             if (!segment.is_extrusion || !show_extrusions_)
                 continue;
-            if (segment.object_name.empty())
+            if (segment.object_name_index < 0)
                 continue;
 
             glm::vec4 start_clip = transform * glm::vec4(segment.start, 1.0f);
@@ -1725,7 +1725,7 @@ std::optional<std::string> GCodeGLESRenderer::pick_object(const glm::vec2& scree
 
             if (dist < PICK_THRESHOLD && dist < closest_distance) {
                 closest_distance = dist;
-                picked_object = segment.object_name;
+                picked_object = gcode.get_object_name(segment.object_name_index);
             }
         }
     }

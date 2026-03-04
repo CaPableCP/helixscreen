@@ -146,9 +146,9 @@ TEST_CASE("MultiColor - Wipe tower detection", "[gcode][multicolor][parser]") {
         auto result = parser.finalize();
 
         REQUIRE(result.layers[0].segments.size() >= 3);
-        REQUIRE(result.layers[0].segments[0].object_name != "__WIPE_TOWER__");
-        REQUIRE(result.layers[0].segments[1].object_name == "__WIPE_TOWER__");
-        REQUIRE(result.layers[0].segments[2].object_name != "__WIPE_TOWER__");
+        REQUIRE(result.get_object_name(result.layers[0].segments[0].object_name_index) != "__WIPE_TOWER__");
+        REQUIRE(result.get_object_name(result.layers[0].segments[1].object_name_index) == "__WIPE_TOWER__");
+        REQUIRE(result.get_object_name(result.layers[0].segments[2].object_name_index) != "__WIPE_TOWER__");
     }
 
     SECTION("Handle wipe tower brim markers") {
@@ -158,7 +158,7 @@ TEST_CASE("MultiColor - Wipe tower detection", "[gcode][multicolor][parser]") {
 
         auto result = parser.finalize();
 
-        REQUIRE(result.layers[0].segments[0].object_name == "__WIPE_TOWER__");
+        REQUIRE(result.get_object_name(result.layers[0].segments[0].object_name_index) == "__WIPE_TOWER__");
     }
 }
 
@@ -373,7 +373,7 @@ TEST_CASE("MultiColor - Synthetic multi-layer multi-tool file",
     SECTION("Wipe tower segments detected") {
         bool found_wipe_tower = false;
         for (const auto& seg : result.layers[0].segments) {
-            if (seg.object_name == "__WIPE_TOWER__") {
+            if (result.get_object_name(seg.object_name_index) == "__WIPE_TOWER__") {
                 found_wipe_tower = true;
                 break;
             }

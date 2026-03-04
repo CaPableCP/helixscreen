@@ -91,9 +91,9 @@ TEST_CASE("GCodeLayerCache basic operations", "[gcode][cache]") {
 
 TEST_CASE("GCodeLayerCache LRU eviction", "[gcode][cache]") {
     // Budget that fits ~2 layers of 50 segments each
-    // 50 segments * 80 bytes = 4KB per layer + overhead
-    // Budget of 10KB should fit ~2 layers
-    GCodeLayerCache cache(10 * 1024);
+    // 50 segments * 40 bytes = 2KB per layer + 64 overhead ≈ 2.1KB
+    // Budget of 5KB should fit ~2 layers
+    GCodeLayerCache cache(5 * 1024);
 
     std::vector<size_t> loaded;
 

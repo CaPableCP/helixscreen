@@ -31,15 +31,8 @@ size_t GCodeLayerCache::estimate_memory(const std::vector<ToolpathSegment>& segm
 
     size_t per_segment = BYTES_PER_SEGMENT;
 
-    // Add extra for segments with long object names
-    size_t string_overhead = 0;
-    for (const auto& seg : segments) {
-        if (seg.object_name.length() > 15) { // Beyond SSO threshold
-            string_overhead += seg.object_name.length() + 1;
-        }
-    }
-
-    return base_cost + (segments.size() * per_segment) + string_overhead;
+    // No string overhead: object names are interned as int16_t indices
+    return base_cost + (segments.size() * per_segment);
 }
 
 GCodeLayerCache::CacheResult

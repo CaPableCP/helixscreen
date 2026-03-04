@@ -425,6 +425,8 @@ uint8_t GeometryBuilder::add_to_color_palette(RibbonGeometry& geometry, uint32_t
 
 RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
                                       const SimplificationOptions& options) {
+    current_gcode_ = &gcode;
+
     // Start timing
     auto build_start = std::chrono::high_resolution_clock::now();
 
@@ -699,7 +701,7 @@ GeometryBuilder::simplify_segments(const std::vector<ToolpathSegment>& segments,
         bool same_type = (current.is_extrusion == next.is_extrusion);
         bool same_layer = (current.layer_index == next.layer_index);
         bool endpoints_connect = glm::distance2(current.end, next.start) < 0.0001f;
-        bool same_object = (current.object_name == next.object_name);
+        bool same_object = (current.object_name_index == next.object_name_index);
         bool same_width = (std::abs(current.width - next.width) < 0.001f);
 
         if (same_type && same_layer && endpoints_connect && same_object && same_width) {
@@ -812,8 +814,11 @@ GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, Ribbon
 
     // Compute color
     uint32_t rgb = compute_segment_color(segment, quant.min_bounds.z, quant.max_bounds.z);
-    if (!highlighted_objects_.empty() && !segment.object_name.empty() &&
-        highlighted_objects_.count(segment.object_name) > 0) {
+    const std::string& seg_obj_name =
+        current_gcode_ ? current_gcode_->get_object_name(segment.object_name_index)
+                        : *([]() -> const std::string* { static const std::string e; return &e; })();
+    if (!highlighted_objects_.empty() && !seg_obj_name.empty() &&
+        highlighted_objects_.count(seg_obj_name) > 0) {
         constexpr float HIGHLIGHT_BRIGHTNESS = 1.8f;
         uint8_t r =
             static_cast<uint8_t>(std::min(255.0f, ((rgb >> 16) & 0xFF) * HIGHLIGHT_BRIGHTNESS));

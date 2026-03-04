@@ -17,6 +17,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 namespace helix {
@@ -412,6 +413,16 @@ class GCodeStreamingController {
      */
     const GCodeHeaderMetadata* get_header_metadata() const;
 
+    /**
+     * @brief Resolve an object name index to a string
+     *
+     * Uses the merged string table built from all parsed layers.
+     *
+     * @param index Object name index from ToolpathSegment
+     * @return Resolved object name, or empty string if invalid
+     */
+    const std::string& get_object_name(int16_t index) const;
+
   private:
     /**
      * @brief Load a layer from source and parse to segments
@@ -452,6 +463,23 @@ class GCodeStreamingController {
     // State
     std::atomic<bool> is_open_{false};
     size_t prefetch_radius_{DEFAULT_PREFETCH_RADIUS};
+
+    // Merged object name string table (accumulated from all parsed layers)
+    mutable std::mutex name_table_mutex_;
+    std::vector<std::string> merged_object_name_table_;
+    std::unordered_map<std::string, int16_t> merged_object_name_lookup_;
+
+    /**
+     * @brief Remap object name indices from a local parse to the merged table
+     *
+     * After parsing a layer, its local string table indices need remapping
+     * to the merged table. This ensures all segments use consistent indices.
+     *
+     * @param segments Segments to remap (modified in place)
+     * @param local_table Local string table from the parser
+     */
+    void remap_object_name_indices(std::vector<ToolpathSegment>& segments,
+                                   const std::vector<std::string>& local_table);
 
     // Empty stats for when not open
     static const LayerIndexStats empty_stats_;

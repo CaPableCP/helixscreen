@@ -36,7 +36,7 @@ ParsedGCodeFile make_test_gcode() {
     seg1.start = glm::vec3(10.0f, 20.0f, 0.2f);
     seg1.end = glm::vec3(50.0f, 20.0f, 0.2f);
     seg1.is_extrusion = true;
-    seg1.object_name = "cube1";
+    seg1.object_name_index = gcode.intern_object_name("cube1");
     layer.segments.push_back(seg1);
 
     // Object "cube2" - segments at x=[10,50], y=80
@@ -44,7 +44,7 @@ ParsedGCodeFile make_test_gcode() {
     seg2.start = glm::vec3(10.0f, 80.0f, 0.2f);
     seg2.end = glm::vec3(50.0f, 80.0f, 0.2f);
     seg2.is_extrusion = true;
-    seg2.object_name = "cube2";
+    seg2.object_name_index = gcode.intern_object_name("cube2");
     layer.segments.push_back(seg2);
 
     // Unnamed segment at y=50
@@ -52,7 +52,7 @@ ParsedGCodeFile make_test_gcode() {
     seg3.start = glm::vec3(10.0f, 50.0f, 0.2f);
     seg3.end = glm::vec3(50.0f, 50.0f, 0.2f);
     seg3.is_extrusion = true;
-    // object_name left empty
+    // object_name_index left as -1 (default)
     layer.segments.push_back(seg3);
 
     layer.segment_count_extrusion = 3;
@@ -78,7 +78,7 @@ ParsedGCodeFile make_single_object_gcode(const std::string& name, float y) {
     seg.start = glm::vec3(10.0f, y, 0.2f);
     seg.end = glm::vec3(90.0f, y, 0.2f);
     seg.is_extrusion = true;
-    seg.object_name = name;
+    seg.object_name_index = gcode.intern_object_name(name);
     layer.segments.push_back(seg);
 
     layer.bounding_box.expand(seg.start);

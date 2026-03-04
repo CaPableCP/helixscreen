@@ -111,6 +111,8 @@ void GCodeRenderer::reset_colors() {
 
 void GCodeRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode,
                            const GCodeCamera& camera, const lv_area_t* widget_coords) {
+    current_gcode_ = &gcode;
+
     // Ensure colors are loaded from theme on first render
     ensure_colors_initialized();
 
@@ -343,13 +345,16 @@ lv_draw_line_dsc_t GCodeRenderer::get_line_style(const ToolpathSegment& segment,
     lv_draw_line_dsc_init(&dsc);
 
     // Determine line width and base opacity
-    // Check both legacy single-object and multi-select highlighting
-    bool is_highlighted = !segment.object_name.empty() &&
-                          (options_.highlighted_objects.count(segment.object_name) > 0 ||
+    // Resolve object name from interned index
+    const std::string& seg_obj_name =
+        current_gcode_ ? current_gcode_->get_object_name(segment.object_name_index)
+                        : *([]() -> const std::string* { static const std::string e; return &e; })();
+    bool is_highlighted = !seg_obj_name.empty() &&
+                          (options_.highlighted_objects.count(seg_obj_name) > 0 ||
                            (!options_.highlighted_object.empty() &&
-                            segment.object_name == options_.highlighted_object));
+                            seg_obj_name == options_.highlighted_object));
     bool is_excluded =
-        !segment.object_name.empty() && options_.excluded_objects.count(segment.object_name) > 0;
+        !seg_obj_name.empty() && options_.excluded_objects.count(seg_obj_name) > 0;
 
     lv_opa_t base_opa;
     int line_width;
@@ -468,8 +473,11 @@ void GCodeRenderer::draw_line(lv_layer_t* layer, const glm::vec2& p1, const glm:
 std::optional<std::string> GCodeRenderer::pick_object(const glm::vec2& screen_pos,
                                                       const ParsedGCodeFile& gcode,
                                                       const GCodeCamera& camera) const {
+    // Store gcode pointer for name resolution during picking
+    const_cast<GCodeRenderer*>(this)->current_gcode_ = &gcode;
+
     // Segment-based picking: find closest rendered segment to click point
-    // This works even without EXCLUDE_OBJECT metadata by checking segment.object_name
+    // This works even without EXCLUDE_OBJECT metadata by checking segment.object_name_index
 
     glm::mat4 transform = camera.get_view_projection_matrix();
     float closest_distance = std::numeric_limits<float>::max();
@@ -498,7 +506,7 @@ std::optional<std::string> GCodeRenderer::pick_object(const glm::vec2& screen_po
             }
 
             // Skip segments without object names
-            if (segment.object_name.empty()) {
+            if (segment.object_name_index < 0) {
                 continue;
             }
 
@@ -530,7 +538,7 @@ std::optional<std::string> GCodeRenderer::pick_object(const glm::vec2& screen_po
             // Update if this is the closest segment within threshold
             if (dist < PICK_THRESHOLD && dist < closest_distance) {
                 closest_distance = dist;
-                picked_object = segment.object_name;
+                picked_object = gcode.get_object_name(segment.object_name_index);
             }
         }
     }

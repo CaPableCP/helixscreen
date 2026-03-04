@@ -449,6 +449,9 @@ class GCodeRenderer {
     // Statistics (updated each frame)
     size_t segments_rendered_{0};
     size_t segments_culled_{0};
+
+    // Current gcode file (set during render/pick_object, valid only during call)
+    const ParsedGCodeFile* current_gcode_{nullptr};
 };
 
 } // namespace gcode

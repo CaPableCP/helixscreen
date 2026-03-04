@@ -17,6 +17,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace helix {
@@ -73,15 +74,15 @@ struct AABB {
  * - Travel move (is_extrusion=false): Nozzle moves without extruding
  */
 struct ToolpathSegment {
-    glm::vec3 start{0.0f, 0.0f, 0.0f}; ///< Start point (X, Y, Z)
-    glm::vec3 end{0.0f, 0.0f, 0.0f};   ///< End point (X, Y, Z)
-    bool is_extrusion{false};          ///< true if extruding, false if travel move
-    std::string object_name;           ///< Object name (from EXCLUDE_OBJECT_START) or
-                                       ///< empty
-    float extrusion_amount{0.0f};      ///< E-axis delta (mm of filament)
-    float width{0.0f};                 ///< Calculated extrusion width (mm) - 0 means use default
-    int tool_index{0};                 ///< Which tool/extruder printed this (0-indexed)
-    uint16_t layer_index{0};           ///< Source layer index (set during geometry collection)
+    glm::vec3 start{0.0f, 0.0f, 0.0f};   ///< Start point (X, Y, Z) — 12 bytes
+    glm::vec3 end{0.0f, 0.0f, 0.0f};     ///< End point (X, Y, Z) — 12 bytes
+    float extrusion_amount{0.0f};          ///< E-axis delta (mm of filament) — 4 bytes
+    float width{0.0f};                     ///< Calculated extrusion width (mm), 0=default — 4 bytes
+    int16_t object_name_index{-1};         ///< Index into string table (-1 = no object) — 2 bytes
+    uint16_t layer_index{0};               ///< Source layer index (set during geometry collection) — 2 bytes
+    int8_t tool_index{0};                  ///< Which tool/extruder printed this (0-15) — 1 byte
+    bool is_extrusion{false};              ///< true if extruding, false if travel move — 1 byte
+    // 2 bytes padding → total 40 bytes (was ~80 with std::string)
 };
 
 /**
@@ -123,6 +124,7 @@ struct ParsedGCodeFile {
     std::vector<Layer> layers;                  ///< Indexed by layer number
     std::map<std::string, GCodeObject> objects; ///< Object metadata (name → object)
     AABB global_bounding_box;                   ///< Bounds of entire model
+    std::vector<std::string> object_name_table; ///< Interned object name strings
 
     // Statistics
     size_t total_segments{0};                 ///< Total segment count
@@ -168,6 +170,34 @@ struct ParsedGCodeFile {
     int find_layer_at_z(float z) const;
 
     /**
+     * @brief Resolve an object name index to a string
+     * @param index Index from ToolpathSegment::object_name_index
+     * @return Object name string, or empty string if index is invalid
+     */
+    const std::string& get_object_name(int16_t index) const {
+        static const std::string empty;
+        if (index < 0 || static_cast<size_t>(index) >= object_name_table.size())
+            return empty;
+        return object_name_table[index];
+    }
+
+    /**
+     * @brief Intern an object name, returning its index
+     * @param name Object name to intern
+     * @return Index into object_name_table, or -1 if name is empty
+     */
+    int16_t intern_object_name(const std::string& name) {
+        if (name.empty())
+            return -1;
+        for (size_t i = 0; i < object_name_table.size(); ++i) {
+            if (object_name_table[i] == name)
+                return static_cast<int16_t>(i);
+        }
+        object_name_table.push_back(name);
+        return static_cast<int16_t>(object_name_table.size() - 1);
+    }
+
+    /**
      * @brief Clear segment data to free memory
      *
      * After geometry is built, the raw segment data is no longer needed.
@@ -180,8 +210,8 @@ struct ParsedGCodeFile {
     size_t clear_segments() {
         size_t freed = 0;
         for (auto& layer : layers) {
-            // Estimate ~80 bytes per segment
-            freed += layer.segments.size() * 80;
+            // Estimate ~40 bytes per segment (packed struct with interned names)
+            freed += layer.segments.size() * 40;
             layer.segments.clear();
             layer.segments.shrink_to_fit();
         }
@@ -378,6 +408,9 @@ class GCodeParser {
     glm::vec3 current_position_{0.0f, 0.0f, 0.0f}; ///< Current XYZ position
     float current_e_{0.0f};                        ///< Current E (extruder) position
     std::string current_object_;         ///< Current object name (from EXCLUDE_OBJECT_START)
+    int16_t current_object_index_{-1};   ///< Current object name index for segments
+    std::unordered_map<std::string, int16_t> object_name_lookup_; ///< O(1) name → index
+    std::vector<std::string> object_name_table_; ///< Accumulated string table
     bool is_absolute_positioning_{true}; ///< G90 (absolute) vs G91 (relative)
     bool is_absolute_extrusion_{true};   ///< M82 (absolute E) vs M83 (relative E)
 

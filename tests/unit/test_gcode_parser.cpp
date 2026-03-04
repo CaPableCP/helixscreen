@@ -158,9 +158,9 @@ TEST_CASE("GCodeParser - EXCLUDE_OBJECT commands", "[gcode][parser]") {
         auto file = parser.finalize();
 
         REQUIRE(file.total_segments == 3);
-        REQUIRE(file.layers[0].segments[0].object_name == "part1");
-        REQUIRE(file.layers[0].segments[1].object_name == "part1");
-        REQUIRE(file.layers[0].segments[2].object_name == "");
+        REQUIRE(file.get_object_name(file.layers[0].segments[0].object_name_index) == "part1");
+        REQUIRE(file.get_object_name(file.layers[0].segments[1].object_name_index) == "part1");
+        REQUIRE(file.layers[0].segments[2].object_name_index < 0);
     }
 }
 

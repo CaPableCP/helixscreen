@@ -68,6 +68,9 @@ void GCodeParser::reset() {
     current_position_ = glm::vec3(0.0f, 0.0f, 0.0f);
     current_e_ = 0.0f;
     current_object_.clear();
+    current_object_index_ = -1;
+    object_name_lookup_.clear();
+    object_name_table_.clear();
     is_absolute_positioning_ = true;
     is_absolute_extrusion_ = true;
     layers_.clear();
@@ -281,7 +284,17 @@ bool GCodeParser::parse_exclude_object_command(const std::string& line) {
     else if (line.find("EXCLUDE_OBJECT_START") == 0) {
         if (!extract_string_param(line, "NAME", current_object_)) {
             current_object_.clear();
+            current_object_index_ = -1;
             return false;
+        }
+        // Intern the object name for segment tagging
+        auto it = object_name_lookup_.find(current_object_);
+        if (it != object_name_lookup_.end()) {
+            current_object_index_ = it->second;
+        } else {
+            current_object_index_ = static_cast<int16_t>(object_name_table_.size());
+            object_name_table_.push_back(current_object_);
+            object_name_lookup_[current_object_] = current_object_index_;
         }
         spdlog::trace("[GCode Parser] Started object: {}", current_object_);
         return true;
@@ -292,6 +305,7 @@ bool GCodeParser::parse_exclude_object_command(const std::string& line) {
         if (extract_string_param(line, "NAME", name) && name == current_object_) {
             spdlog::trace("[GCode Parser] Ended object: {}", current_object_);
             current_object_.clear();
+            current_object_index_ = -1;
             return true;
         }
     }
@@ -744,15 +758,22 @@ void GCodeParser::add_segment(const glm::vec3& start, const glm::vec3& end, bool
     segment.start = start;
     segment.end = end;
     segment.is_extrusion = is_extrusion;
-    segment.object_name = current_object_;
+    segment.object_name_index = current_object_index_;
     segment.extrusion_amount = e_delta;
 
     // Multi-color support: Tag segment with current tool
-    segment.tool_index = current_tool_index_;
+    segment.tool_index = static_cast<int8_t>(current_tool_index_);
 
-    // Wipe tower support: Tag wipe tower segments with special object name
-    if (in_wipe_tower_) {
-        segment.object_name = "__WIPE_TOWER__";
+    // Wipe tower support: Tag wipe tower segments with interned special name
+    if (in_wipe_tower_ && segment.object_name_index < 0) {
+        auto it = object_name_lookup_.find("__WIPE_TOWER__");
+        if (it != object_name_lookup_.end()) {
+            segment.object_name_index = it->second;
+        } else {
+            segment.object_name_index = static_cast<int16_t>(object_name_table_.size());
+            object_name_table_.push_back("__WIPE_TOWER__");
+            object_name_lookup_["__WIPE_TOWER__"] = segment.object_name_index;
+        }
     }
 
     // Calculate actual extrusion width from E-delta and XY distance
@@ -908,6 +929,9 @@ ParsedGCodeFile GCodeParser::finalize() {
 
     // Transfer multi-color tool palette
     result.tool_color_palette = tool_color_palette_;
+
+    // Transfer interned object name table
+    result.object_name_table = std::move(object_name_table_);
 
     spdlog::info("[GCode Parser] Parsed G-code: {} layers, {} segments, {} objects",
                  result.layers.size(), result.total_segments, result.objects.size());

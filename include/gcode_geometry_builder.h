@@ -505,6 +505,7 @@ class GeometryBuilder {
     uint8_t filament_r_ = 0x26;        ///< Filament color red component
     uint8_t filament_g_ = 0xA6;        ///< Filament color green component
     uint8_t filament_b_ = 0x9A;        ///< Filament color blue component
+    const ParsedGCodeFile* current_gcode_{nullptr}; ///< Set during build() for name resolution
     std::unordered_set<std::string>
         highlighted_objects_;                     ///< Object names to highlight (empty = none)
     bool debug_face_colors_ = false;              ///< Enable per-face debug coloring
