@@ -14,7 +14,7 @@
       <setting_form_input name="row_printer_port" label="Port" placeholder="9100"/>
       <!-- Label Size -->
       <setting_dropdown_row name="row_label_size"
-                            label="Label Size" label_tag="Label Size" icon="straighten"
+                            label="Label Size" label_tag="Label Size" icon="ruler"
                             description="Select your label media"
                             description_tag="Select your label media"
                             callback="on_lp_label_size_changed"/>

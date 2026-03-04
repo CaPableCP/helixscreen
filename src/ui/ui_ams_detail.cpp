@@ -18,6 +18,11 @@
 // 3D Tray Box Drawing
 // ============================================================================
 
+/// Helper: create lv_point_precise_t from int32_t (avoids narrowing on float targets)
+static inline lv_point_precise_t pt(int32_t x, int32_t y) {
+    return {static_cast<lv_value_precise_t>(x), static_cast<lv_value_precise_t>(y)};
+}
+
 /// Shared geometry for 3D tray box draw callbacks
 struct TrayBoxData {
     int32_t tray_height = 0; ///< Height of the front face
@@ -111,12 +116,12 @@ static void tray_back_draw_cb(lv_event_t* e) {
     line_dsc.opa = LV_OPA_40;
     line_dsc.width = 1;
 
-    line_dsc.p1 = {f.bl, f.bt};
-    line_dsc.p2 = {f.br, f.bt};
+    line_dsc.p1 = pt(f.bl, f.bt);
+    line_dsc.p2 = pt(f.br, f.bt);
     lv_draw_line(layer, &line_dsc);
 
-    line_dsc.p1 = {f.bl, f.bb};
-    line_dsc.p2 = {f.br, f.bb};
+    line_dsc.p1 = pt(f.bl, f.bb);
+    line_dsc.p2 = pt(f.br, f.bb);
     lv_draw_line(layer, &line_dsc);
 }
 
@@ -150,24 +155,24 @@ static void tray_front_draw_cb(lv_event_t* e) {
     // Left side wall (receding -- darker, dim edges)
     draw_quad(layer, ams_draw::darken_color(bg, SHADE_LEFT_WALL), opa, f.fl, f.ft, f.bl, f.bt,
               f.bl, f.bb, f.fl, f.fb);
-    dim_edge.p1 = {f.fl, f.ft};
-    dim_edge.p2 = {f.bl, f.bt};
+    dim_edge.p1 = pt(f.fl, f.ft);
+    dim_edge.p2 = pt(f.bl, f.bt);
     lv_draw_line(layer, &dim_edge);
-    dim_edge.p1 = {f.fl, f.fb};
-    dim_edge.p2 = {f.bl, f.bb};
+    dim_edge.p1 = pt(f.fl, f.fb);
+    dim_edge.p2 = pt(f.bl, f.bb);
     lv_draw_line(layer, &dim_edge);
-    dim_edge.p1 = {f.bl, f.bt};
-    dim_edge.p2 = {f.bl, f.bb};
+    dim_edge.p1 = pt(f.bl, f.bt);
+    dim_edge.p2 = pt(f.bl, f.bb);
     lv_draw_line(layer, &dim_edge);
 
     // Right side wall (visible -- lighter, bright edges)
     draw_quad(layer, ams_draw::lighten_color(bg, SHADE_RIGHT_WALL), opa, f.fr, f.ft, f.br, f.bt,
               f.br, f.bb, f.fr, f.fb);
-    bright_edge.p1 = {f.fr, f.ft};
-    bright_edge.p2 = {f.br, f.bt};
+    bright_edge.p1 = pt(f.fr, f.ft);
+    bright_edge.p2 = pt(f.br, f.bt);
     lv_draw_line(layer, &bright_edge);
-    bright_edge.p1 = {f.fr, f.fb};
-    bright_edge.p2 = {f.br, f.bb};
+    bright_edge.p1 = pt(f.fr, f.fb);
+    bright_edge.p2 = pt(f.br, f.bb);
     lv_draw_line(layer, &bright_edge);
 
     // Front face (main rectangle, drawn last so it's on top)

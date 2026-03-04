@@ -5,7 +5,7 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.97.0] - 2026-03-03
+## [0.96.3] - 2026-03-03
 
 This release adds a floating emergency stop button, temperature sensor carousel with multi-sensor picker, 3D box effects on AMS trays with Happy Hare Type B hub detection, and improved DRM display rotation robustness. QR label printing for Brother QL printers is available as a beta feature.
 
@@ -1528,7 +1528,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
-[0.97.0]: https://github.com/prestonbrown/helixscreen/compare/v0.96.2...v0.97.0
+[0.96.3]: https://github.com/prestonbrown/helixscreen/compare/v0.96.2...v0.96.3
 [0.96.2]: https://github.com/prestonbrown/helixscreen/compare/v0.96.1...v0.96.2
 [0.96.1]: https://github.com/prestonbrown/helixscreen/compare/v0.96.0...v0.96.1
 [0.96.0]: https://github.com/prestonbrown/helixscreen/compare/v0.95.3...v0.96.0
