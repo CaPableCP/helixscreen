@@ -809,8 +809,10 @@ struct AmsSystemInfo {
     int encoder_flow_rate = -1;      ///< Encoder flow rate (-1=unavailable)
     EncoderClogInfo encoder_info;    ///< Encoder-based clog detection state
     FlowguardInfo flowguard_info;    ///< Flowguard clog/tangle detection state
-    float sync_feedback_flow_rate = -1; ///< Sync feedback flow rate
-    float toolchange_purge_volume = 0; ///< Slicer purge volume for toolchanges
+    float sync_feedback_flow_rate = -1;    ///< Sync feedback flow rate
+    float sync_feedback_bias = -2;         ///< Modelled bias [-1.0,1.0], -2=unavailable
+    float sync_feedback_bias_raw = -2;     ///< Raw sensor bias [-1.0,1.0], -2=unavailable
+    float toolchange_purge_volume = 0;     ///< Slicer purge volume for toolchanges
 
     // Tool-to-slot mapping (Happy Hare uses "gate" internally)
     std::vector<int> tool_to_slot_map; ///< tool_to_slot_map[tool] = slot
