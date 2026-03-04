@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "ui_ams_dryer_card.h"
 #include "ui_clog_meter.h"
 #include "ui_observer_guard.h"
 
@@ -109,7 +108,6 @@ class AmsOperationSidebar {
     lv_obj_t* step_progress_container_ = nullptr;
 
     // Extracted UI modules
-    std::unique_ptr<AmsDryerCard> dryer_card_;
     std::unique_ptr<UiClogMeter> clog_meter_;
 
     // Bypass spool observer (updates sidebar if needed)

@@ -298,6 +298,12 @@ void AmsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     sidebar_->setup(panel_);
     sidebar_->init_observers();
 
+    // Setup dryer card (info bar)
+    if (!dryer_card_) {
+        dryer_card_ = std::make_unique<helix::ui::AmsDryerCard>();
+    }
+    dryer_card_->setup(panel_);
+
     spdlog::debug("[{}] Setup complete!", get_name());
 }
 
@@ -421,6 +427,7 @@ void AmsPanel::clear_panel_reference() {
 
     // Reset extracted UI modules (they handle their own RAII cleanup)
     sidebar_.reset();
+    dryer_card_.reset();
     context_menu_.reset();
     edit_modal_.reset();
     error_modal_.reset();

@@ -5,6 +5,7 @@
 
 #include "ui_ams_context_menu.h"
 #include "ui_ams_detail.h"
+#include "ui_ams_dryer_card.h"
 #include "ui_ams_edit_modal.h"
 #include "ui_ams_sidebar.h"
 #include "ui_observer_guard.h"
@@ -135,6 +136,9 @@ class AmsOverviewPanel : public PanelBase {
 
     // === Sidebar ===
     std::unique_ptr<helix::ui::AmsOperationSidebar> sidebar_;
+
+    // === Dryer Card (info bar) ===
+    std::unique_ptr<helix::ui::AmsDryerCard> dryer_card_;
 
     // === Event Handling ===
     static void on_unit_card_clicked(lv_event_t* e);

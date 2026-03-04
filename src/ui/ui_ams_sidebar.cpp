@@ -4,7 +4,6 @@
 #include "ui_ams_sidebar.h"
 
 #include "ui_ams_device_operations_overlay.h"
-#include "ui_ams_dryer_card.h"
 #include "ui_callback_helpers.h"
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
@@ -143,12 +142,6 @@ bool AmsOperationSidebar::setup(lv_obj_t* panel) {
 
     // Setup step progress
     setup_step_progress();
-
-    // Setup dryer card (extracted module)
-    if (!dryer_card_) {
-        dryer_card_ = std::make_unique<AmsDryerCard>();
-    }
-    dryer_card_->setup(panel);
 
     // Setup clog detection meter
     clog_meter_ = std::make_unique<UiClogMeter>(sidebar_root_);
@@ -289,7 +282,6 @@ void AmsOperationSidebar::cleanup() {
     // Reset extracted modules AFTER observers — they may have their own observers
     // that reference widget pointers; resetting before our observers could
     // trigger callbacks on already-null widget pointers.
-    dryer_card_.reset();
     clog_meter_.reset();
 
     // Clear all pending state

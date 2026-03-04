@@ -176,6 +176,12 @@ void AmsOverviewPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     sidebar_->setup(panel_);
     sidebar_->init_observers();
 
+    // Setup dryer card (info bar)
+    if (!dryer_card_) {
+        dryer_card_ = std::make_unique<helix::ui::AmsDryerCard>();
+    }
+    dryer_card_->setup(panel_);
+
     // Initial population from backend state
     refresh_units();
 
@@ -844,8 +850,9 @@ void AmsOverviewPanel::clear_panel_reference() {
     slots_version_observer_.reset();
     external_spool_observer_.reset();
 
-    // Clean up sidebar before clearing panel references
+    // Clean up sidebar and dryer card before clearing panel references
     sidebar_.reset();
+    dryer_card_.reset();
 
     // Clear global instance pointer
     g_overview_panel_instance.store(nullptr);
