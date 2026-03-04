@@ -112,11 +112,10 @@ TEST_CASE("MacroParamCache uppercase configfile keys match known_macros", "[macr
     cache.populate_from_configfile(config, known_macros);
 
     // Must NOT be UNKNOWN — the uppercase configfile key must match
+    // variable_* fields are ignored (internal state, not user params)
     auto info = cache.get("CLEAN_NOZZLE");
-    REQUIRE(info.knowledge == MacroParamKnowledge::KNOWN_PARAMS);
-    REQUIRE(info.params.size() == 1);
-    CHECK(info.params[0].name == "START_X");
-    CHECK(info.params[0].is_variable);
+    REQUIRE(info.knowledge == MacroParamKnowledge::KNOWN_NO_PARAMS);
+    REQUIRE(info.params.empty());
 }
 
 TEST_CASE("MacroParamCache multiple params extracted", "[macro_param_cache]") {
@@ -151,10 +150,10 @@ TEST_CASE("MacroParamCache handles missing gcode field", "[macro_param_cache]") 
 }
 
 // ============================================================================
-// variable_* field parsing tests
+// variable_* fields are intentionally ignored (internal macro state)
 // ============================================================================
 
-TEST_CASE("MacroParamCache extracts variable_* fields", "[macro_param_cache]") {
+TEST_CASE("MacroParamCache ignores variable_* fields", "[macro_param_cache]") {
     auto& cache = MacroParamCache::instance();
     cache.clear();
 
@@ -168,21 +167,12 @@ TEST_CASE("MacroParamCache extracts variable_* fields", "[macro_param_cache]") {
     cache.populate_from_configfile(config, {});
 
     auto info = cache.get("CLEAN_NOZZLE");
-    REQUIRE(info.knowledge == MacroParamKnowledge::KNOWN_PARAMS);
-    REQUIRE(info.params.size() == 3);
-
-    // All should be variables
-    std::map<std::string, std::string> var_map;
-    for (const auto& p : info.params) {
-        REQUIRE(p.is_variable);
-        var_map[p.name] = p.default_value;
-    }
-    CHECK(var_map["START_X"] == "265");
-    CHECK(var_map["START_Y"] == "298");
-    CHECK(var_map["WIPE_QTY"] == "4");
+    // No params.* references in template, variables ignored → no params
+    REQUIRE(info.knowledge == MacroParamKnowledge::KNOWN_NO_PARAMS);
+    REQUIRE(info.params.empty());
 }
 
-TEST_CASE("MacroParamCache mixed params and variables", "[macro_param_cache]") {
+TEST_CASE("MacroParamCache params extracted but variables ignored", "[macro_param_cache]") {
     auto& cache = MacroParamCache::instance();
     cache.clear();
 
@@ -195,28 +185,14 @@ TEST_CASE("MacroParamCache mixed params and variables", "[macro_param_cache]") {
 
     auto info = cache.get("START_PRINT");
     REQUIRE(info.knowledge == MacroParamKnowledge::KNOWN_PARAMS);
-    REQUIRE(info.params.size() == 2);
-
-    // One param, one variable
-    bool found_param = false;
-    bool found_var = false;
-    for (const auto& p : info.params) {
-        if (p.name == "BED_TEMP") {
-            CHECK_FALSE(p.is_variable);
-            CHECK(p.default_value == "60");
-            found_param = true;
-        }
-        if (p.name == "IDLE_STATE") {
-            CHECK(p.is_variable);
-            CHECK(p.default_value == "false");
-            found_var = true;
-        }
-    }
-    CHECK(found_param);
-    CHECK(found_var);
+    // Only the params.* reference, not the variable_*
+    REQUIRE(info.params.size() == 1);
+    CHECK(info.params[0].name == "BED_TEMP");
+    CHECK(info.params[0].default_value == "60");
+    CHECK_FALSE(info.params[0].is_variable);
 }
 
-TEST_CASE("MacroParamCache variable-only macro is KNOWN_PARAMS", "[macro_param_cache]") {
+TEST_CASE("MacroParamCache variable-only macro is KNOWN_NO_PARAMS", "[macro_param_cache]") {
     auto& cache = MacroParamCache::instance();
     cache.clear();
 
@@ -229,11 +205,9 @@ TEST_CASE("MacroParamCache variable-only macro is KNOWN_PARAMS", "[macro_param_c
 
     cache.populate_from_configfile(config, {});
 
+    // Variables are internal state, not user-facing params
     auto info = cache.get("BEDFANVARS");
-    REQUIRE(info.knowledge == MacroParamKnowledge::KNOWN_PARAMS);
-    REQUIRE(info.params.size() == 3);
-    for (const auto& p : info.params) {
-        CHECK(p.is_variable);
-    }
+    REQUIRE(info.knowledge == MacroParamKnowledge::KNOWN_NO_PARAMS);
+    REQUIRE(info.params.empty());
 }
 

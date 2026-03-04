@@ -57,28 +57,10 @@ void MacroParamCache::populate_from_configfile(
         CachedMacroInfo info;
         auto params = parse_macro_params(gcode_template);
 
-        // Extract variable_* keys from the config section.
-        // These are Klipper gcode_macro variables set via SET_GCODE_VARIABLE.
-        static constexpr std::string_view VAR_PREFIX = "variable_";
-        if (it.value().is_object()) {
-            for (auto vit = it.value().begin(); vit != it.value().end(); ++vit) {
-                if (vit.key().size() > VAR_PREFIX.size() &&
-                    vit.key().compare(0, VAR_PREFIX.size(), VAR_PREFIX) == 0) {
-                    std::string var_name = vit.key().substr(VAR_PREFIX.size());
-                    std::transform(var_name.begin(), var_name.end(), var_name.begin(),
-                                   [](unsigned char c) { return std::toupper(c); });
-
-                    std::string var_value;
-                    if (vit.value().is_string()) {
-                        var_value = vit.value().get<std::string>();
-                    } else {
-                        var_value = vit.value().dump();
-                    }
-
-                    params.push_back({var_name, var_value, /*is_variable=*/true});
-                }
-            }
-        }
+        // Note: variable_* keys (Klipper SET_GCODE_VARIABLE state) are
+        // intentionally NOT included. They are internal macro state, not
+        // user-facing parameters. User params are already extracted from
+        // the gcode template (params.NAME references) above.
 
         if (params.empty()) {
             info.knowledge = MacroParamKnowledge::KNOWN_NO_PARAMS;
