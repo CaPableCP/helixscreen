@@ -564,6 +564,13 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
 
     ui_filament_path_canvas_set_buffer_info(canvas, buffer_present, buffer_state);
 
+    // Set proportional bias for Happy Hare
+    if (info.type == AmsType::HAPPY_HARE && info.sync_feedback_bias > -1.5f) {
+        ui_filament_path_canvas_set_buffer_bias(canvas, info.sync_feedback_bias);
+    } else {
+        ui_filament_path_canvas_set_buffer_bias(canvas, -2.0f); // discrete mode
+    }
+
     // Set external spool color and assignment state
     auto ext_spool = AmsState::instance().get_external_spool_info();
     ui_filament_path_canvas_set_bypass_has_spool(canvas, ext_spool.has_value());

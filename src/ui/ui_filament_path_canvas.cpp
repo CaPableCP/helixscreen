@@ -21,6 +21,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <memory>
@@ -142,6 +143,7 @@ struct FilamentPathData {
     // Buffer element (TurtleNeck / eSpooler visualization)
     bool buffer_present = false; // true = draw buffer box between hub and toolhead
     int buffer_state = 0;        // 0=neutral, 1=compressed, 2=tension (coil icon spacing)
+    float buffer_bias = -2.0f;   ///< Proportional bias [-1.0,1.0], -2=unavailable (use discrete)
 
     // Heat glow state
     bool heat_active = false;               // true when nozzle is actively heating
@@ -1181,27 +1183,47 @@ static void draw_hub_box(lv_layer_t* layer, int32_t cx, int32_t cy, int32_t widt
 // Represents TurtleNeck buffer (AFC) or eSpooler sync feedback (Happy Hare)
 static void draw_buffer_coil(lv_layer_t* layer, int32_t cx, int32_t cy, int32_t hub_w,
                               int32_t hub_h, int buffer_state, int buffer_fault_state,
-                              lv_color_t bg_color, int32_t radius, bool has_filament,
-                              lv_color_t filament_color) {
+                              float buffer_bias, lv_color_t bg_color, int32_t radius,
+                              bool has_filament, lv_color_t filament_color) {
     // Box dimensions: ~40% hub width, ~55% hub height
     int32_t box_w = hub_w * 2 / 5;
     int32_t box_h = hub_h * 55 / 100;
     if (box_w < 16) box_w = 16;
     if (box_h < 10) box_h = 10;
 
-    // Border/coil color based on fault state
+    // Border/coil color based on fault state and proportional bias
     lv_color_t border_color;
     lv_color_t coil_bg = bg_color;
+
     if (buffer_fault_state >= 2) {
-        border_color = lv_color_hex(0xEF4444); // Red — fault
-        coil_bg = lv_color_hex(0x3F1111);      // Red-tinted background
+        // Fault — always red regardless of bias
+        border_color = lv_color_hex(0xEF4444);
+        coil_bg = lv_color_hex(0x3F1111);
+    } else if (buffer_bias > -1.5f) {
+        // Proportional mode: interpolate green -> orange -> red based on abs(bias)
+        float abs_bias = std::fabs(buffer_bias);
+        abs_bias = std::clamp(abs_bias, 0.0f, 1.0f);
+
+        if (abs_bias < 0.3f) {
+            border_color = lv_color_hex(0x22C55E); // Green
+        } else if (abs_bias < 0.7f) {
+            float t = (abs_bias - 0.3f) / 0.4f;
+            border_color = ph_blend(lv_color_hex(0x22C55E), lv_color_hex(0xF59E0B), t);
+        } else {
+            float t = (abs_bias - 0.7f) / 0.3f;
+            border_color = ph_blend(lv_color_hex(0xF59E0B), lv_color_hex(0xEF4444), t);
+        }
+        if (has_filament) {
+            coil_bg = ph_blend(bg_color, filament_color, 0.33f);
+        }
     } else if (buffer_fault_state == 1 || buffer_state != 0) {
-        border_color = lv_color_hex(0xF59E0B); // Orange — warning/non-neutral
+        // Discrete fallback (AFC or unavailable bias)
+        border_color = lv_color_hex(0xF59E0B);
         if (has_filament) {
             coil_bg = ph_blend(bg_color, filament_color, 0.33f);
         }
     } else {
-        border_color = lv_color_hex(0x22C55E); // Green — healthy/neutral
+        border_color = lv_color_hex(0x22C55E);
         if (has_filament) {
             coil_bg = ph_blend(bg_color, filament_color, 0.33f);
         }
@@ -2016,8 +2038,8 @@ static void filament_path_draw_cb(lv_event_t* e) {
         lv_color_t buf_fil_color = data->bypass_active ? lv_color_hex(data->bypass_color)
                                                        : active_color;
         draw_buffer_coil(layer, center_x, buffer_y, data->hub_width, hub_h, data->buffer_state,
-                         data->buffer_fault_state, bg_color, data->border_radius,
-                         buffer_has_filament, buf_fil_color);
+                         data->buffer_fault_state, data->buffer_bias, bg_color,
+                         data->border_radius, buffer_has_filament, buf_fil_color);
     }
 
     // ========================================================================
@@ -2946,6 +2968,14 @@ void ui_filament_path_canvas_set_buffer_info(lv_obj_t* obj, bool present, int st
         data->buffer_present = present;
         data->buffer_state = state;
         spdlog::debug("[FilamentPath] Buffer info: present={}, state={}", present, state);
+        lv_obj_invalidate(obj);
+    }
+}
+
+void ui_filament_path_canvas_set_buffer_bias(lv_obj_t* obj, float bias) {
+    auto* data = get_data(obj);
+    if (data) {
+        data->buffer_bias = bias;
         lv_obj_invalidate(obj);
     }
 }

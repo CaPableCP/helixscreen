@@ -355,6 +355,18 @@ void ui_filament_path_canvas_set_buffer_fault_state(lv_obj_t* obj, int state);
 void ui_filament_path_canvas_set_buffer_info(lv_obj_t* obj, bool present, int state);
 
 /**
+ * @brief Set proportional buffer bias for smooth color interpolation
+ *
+ * When set to a valid value (> -1.5), the buffer coil color interpolates
+ * smoothly from green (neutral) through orange to red based on abs(bias).
+ * When unavailable (-2.0), falls back to discrete 3-state color logic.
+ *
+ * @param obj The filament_path_canvas widget
+ * @param bias Bias value [-1.0,1.0], or -2.0 for unavailable (discrete mode)
+ */
+void ui_filament_path_canvas_set_buffer_bias(lv_obj_t* obj, float bias);
+
+/**
  * @brief Set bypass entry filament color
  * @param obj The filament_path_canvas widget
  * @param color RGB color (0xRRGGBB) for bypass filament
