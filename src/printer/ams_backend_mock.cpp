@@ -150,6 +150,14 @@ AmsBackendMock::AmsBackendMock(int slot_count) {
     unit_meta.has_slot_sensors = true;
     system_info_.units.push_back(unit_meta);
 
+    // Mock sync feedback (proportional sensor, slight compression)
+    system_info_.sync_feedback_state = "compressed";
+    system_info_.sync_feedback_bias = 0.15f;
+    system_info_.sync_feedback_bias_raw = 0.18f;
+    system_info_.sync_feedback_flow_rate = 98.5f;
+    system_info_.espooler_state = "assist";
+    system_info_.sync_drive = true;
+
     // Mock encoder clog detection (auto mode, 85% flow, realistic headroom values)
     system_info_.clog_detection = 2; // Auto mode
     system_info_.encoder_flow_rate = 85;
@@ -351,12 +359,17 @@ AmsSystemInfo AmsBackendMock::get_system_info() const {
         info.units[u].firmware_version = system_info_.units[u].firmware_version;
     }
 
-    // Copy clog detection / encoder / flowguard fields
+    // Copy clog detection / encoder / flowguard / sync feedback fields
     info.clog_detection = system_info_.clog_detection;
     info.encoder_flow_rate = system_info_.encoder_flow_rate;
     info.encoder_info = system_info_.encoder_info;
     info.flowguard_info = system_info_.flowguard_info;
     info.sync_feedback_flow_rate = system_info_.sync_feedback_flow_rate;
+    info.sync_feedback_state = system_info_.sync_feedback_state;
+    info.sync_feedback_bias = system_info_.sync_feedback_bias;
+    info.sync_feedback_bias_raw = system_info_.sync_feedback_bias_raw;
+    info.espooler_state = system_info_.espooler_state;
+    info.sync_drive = system_info_.sync_drive;
 
     return info;
 }
