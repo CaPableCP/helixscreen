@@ -336,6 +336,7 @@ void register_xml_components() {
     register_xml("components/panel_widget_print_stats.xml");
     register_xml("components/panel_widget_gcode_console.xml");
     register_xml("components/clog_detection_config_modal.xml");
+    register_xml("components/buffer_status_modal.xml");
     register_xml("job_queue_modal.xml");
     register_xml("thermistor_sensor_picker.xml");
     register_xml("thermistor_configure_picker.xml");

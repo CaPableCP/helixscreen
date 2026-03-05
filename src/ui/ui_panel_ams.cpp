@@ -4,6 +4,7 @@
 #include "ui_panel_ams.h"
 
 #include "ui_ams_detail.h"
+#include "buffer_status_modal.h"
 #include "ui_ams_device_operations_overlay.h"
 #include "ui_ams_sidebar.h"
 #include "ui_ams_tool_text.h"
@@ -1121,93 +1122,8 @@ void AmsPanel::handle_buffer_click() {
         return;
 
     auto info = backend->get_system_info();
-
-    // Find the effective unit for buffer health
     int effective_unit = (scoped_unit_index_ >= 0) ? scoped_unit_index_ : 0;
-
-    std::string message;
-    const char* title = lv_tr("Buffer Status");
-
-    if (info.type == AmsType::AFC) {
-        // AFC: Show buffer health from the unit
-        bool found_health = false;
-        if (effective_unit >= 0 && effective_unit < static_cast<int>(info.units.size())) {
-            const auto& unit = info.units[effective_unit];
-            if (unit.buffer_health.has_value()) {
-                const auto& bh = unit.buffer_health.value();
-                message += fmt::format("{}: {}\n", lv_tr("State"),
-                                       bh.state.empty() ? lv_tr("Unknown") : bh.state.c_str());
-                if (bh.fault_detection_enabled) {
-                    if (bh.distance_to_fault >= 0) {
-                        message += fmt::format("{}: {:.1f} mm\n", lv_tr("Distance to Fault"),
-                                               bh.distance_to_fault);
-                        message += fmt::format("  {}\n",
-                                               lv_tr("(extrusion remaining before clog fault triggers)"));
-                    }
-                    message += fmt::format("{}: {}", lv_tr("Fault Detection"), lv_tr("Enabled"));
-                } else {
-                    message += fmt::format("{}: {}", lv_tr("Fault Detection"), lv_tr("Disabled"));
-                }
-                found_health = true;
-            }
-        }
-        if (!found_health) {
-            message = lv_tr("No buffer data available");
-        }
-    } else if (info.type == AmsType::HAPPY_HARE) {
-        title = lv_tr("Sync Feedback");
-
-        // Proportional bias display
-        if (info.sync_feedback_bias > -1.5f) {
-            float abs_bias = std::fabs(info.sync_feedback_bias);
-            int pct = static_cast<int>(abs_bias * 100.0f);
-            const char* direction;
-            if (abs_bias < 0.02f) {
-                direction = "N"; // i18n: do not translate (Neutral indicator)
-            } else if (info.sync_feedback_bias < 0) {
-                direction = "T"; // i18n: do not translate (Tension indicator)
-            } else {
-                direction = "C"; // i18n: do not translate (Compression indicator)
-            }
-            message += fmt::format("{}: {} {}%\n", lv_tr("Buffer Position"),
-                                   direction, pct);
-            message += fmt::format("{}: {:.3f}\n", lv_tr("Bias (modelled)"),
-                                   info.sync_feedback_bias);
-        }
-
-        // Existing fields
-        if (!info.sync_feedback_state.empty() && info.sync_feedback_state != "disabled") {
-            message += fmt::format("{}: {}\n", lv_tr("Sync Feedback"),
-                                   info.sync_feedback_state);
-        }
-        if (!info.espooler_state.empty()) {
-            message += fmt::format("{}: {}\n", lv_tr("eSpooler"), info.espooler_state);
-        }
-        message += fmt::format("{}: {}\n", lv_tr("Sync Drive"),
-                               info.sync_drive ? lv_tr("Active") : lv_tr("Inactive"));
-        if (info.clog_detection > 0) {
-            message += fmt::format("{}: {}\n", lv_tr("Clog Detection"),
-                                   info.clog_detection == 2 ? lv_tr("Auto") : lv_tr("Manual"));
-        }
-        if (info.sync_feedback_flow_rate >= 0) {
-            message += fmt::format("{}: {:.0f}%", lv_tr("Flow Rate"),
-                                   info.sync_feedback_flow_rate);
-        } else if (info.encoder_flow_rate >= 0) {
-            message += fmt::format("{}: {}%", lv_tr("Flow Rate"), info.encoder_flow_rate);
-        }
-
-        // Trim trailing newline
-        if (!message.empty() && message.back() == '\n') {
-            message.pop_back();
-        }
-        if (message.empty()) {
-            message = lv_tr("No sync feedback data available");
-        }
-    } else {
-        message = lv_tr("Buffer information not available for this backend");
-    }
-
-    helix::ui::modal_show_alert(title, message.c_str(), ModalSeverity::Info);
+    BufferStatusModal::show_for(info, effective_unit);
 }
 
 void AmsPanel::on_path_slot_clicked(int slot_index, void* user_data) {

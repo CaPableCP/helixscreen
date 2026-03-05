@@ -46,7 +46,6 @@ class UiBufferMeter {
     lv_obj_t* root_ = nullptr;
     lv_obj_t* canvas_obj_ = nullptr;
     lv_obj_t* direction_label_ = nullptr;
-    lv_obj_t* neutral_label_ = nullptr;
 
     float bias_ = 0.0f;
 };

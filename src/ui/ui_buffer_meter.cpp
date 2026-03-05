@@ -30,26 +30,23 @@ UiBufferMeter::UiBufferMeter(lv_obj_t* parent) {
     // Create drawing object
     canvas_obj_ = lv_obj_create(root_);
     lv_obj_remove_style_all(canvas_obj_);
-    lv_obj_set_size(canvas_obj_, LV_PCT(60), LV_PCT(80));
+    lv_obj_set_size(canvas_obj_, LV_PCT(40), LV_PCT(80));
     lv_obj_align(canvas_obj_, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(canvas_obj_, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_clear_flag(canvas_obj_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(canvas_obj_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(canvas_obj_, on_draw, LV_EVENT_DRAW_MAIN, this);
 
-    // Direction + percentage label (right side)
+    // Direction + percentage label (below drawing)
     direction_label_ = lv_label_create(root_);
     lv_obj_set_style_text_font(direction_label_, theme_manager_get_font("font_small"), 0);
     lv_obj_set_style_text_color(direction_label_, theme_manager_get_color("text_muted"), 0);
-    lv_obj_align(direction_label_, LV_ALIGN_RIGHT_MID, -4, 0);
+    lv_obj_set_style_text_align(direction_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(direction_label_, LV_PCT(100));
+    lv_obj_align(direction_label_, LV_ALIGN_BOTTOM_MID, 0, -2);
     lv_label_set_text(direction_label_, "N 0%");
 
-    // Neutral reference label (left side)
-    neutral_label_ = lv_label_create(root_);
-    lv_obj_set_style_text_font(neutral_label_, theme_manager_get_font("font_xs"), 0);
-    lv_obj_set_style_text_color(neutral_label_, theme_manager_get_color("text_muted"), 0);
-    lv_obj_align(neutral_label_, LV_ALIGN_LEFT_MID, 4, 0);
-    lv_label_set_text(neutral_label_, "\xe2\x80\x94"); // em dash as neutral marker
+    // No neutral label — the dashed line in the drawing is sufficient
 
     // SIZE_CHANGED callback for responsive layout
     lv_obj_add_event_cb(root_, on_size_changed, LV_EVENT_SIZE_CHANGED, this);
@@ -93,12 +90,14 @@ void UiBufferMeter::on_size_changed(lv_event_t* e) {
 void UiBufferMeter::update_labels() {
     if (!direction_label_) return;
 
-    float abs_bias = std::fabs(bias_);
-    int pct = static_cast<int>(abs_bias * 100.0f);
-    const char* dir = (abs_bias < 0.02f) ? "N" : (bias_ < 0 ? "T" : "C");
+    int pct = static_cast<int>(bias_ * 100.0f);
 
     char buf[16];
-    lv_snprintf(buf, sizeof(buf), "%s %d%%", dir, pct);
+    if (std::fabs(bias_) < 0.02f) {
+        lv_snprintf(buf, sizeof(buf), "0%%");
+    } else {
+        lv_snprintf(buf, sizeof(buf), "%+d%%", pct);
+    }
     lv_label_set_text(direction_label_, buf);
 }
 
@@ -116,19 +115,24 @@ void UiBufferMeter::draw(lv_layer_t* layer) {
     int32_t rect_w = std::max(MIN_RECT_W, static_cast<int32_t>(w * RECT_WIDTH_RATIO));
     int32_t rect_h = std::max(MIN_RECT_H, static_cast<int32_t>(h * RECT_HEIGHT_RATIO));
 
-    // Bias maps to vertical offset of inner rect
-    // bias=0: centered (50% overlap), bias=-1: inner up (tension), bias=+1: inner down (compression)
-    float max_offset = rect_h * 0.5f;
-    int32_t inner_offset = static_cast<int32_t>(-bias_ * max_offset);
+    // Bias maps to vertical offset of inner rect relative to outer:
+    //   bias= 0: 50% overlap (neutral — plunger halfway in housing)
+    //   bias=-1: 0% overlap  (tension — plunger pulled fully out, upward)
+    //   bias=+1: 100% overlap (compression — plunger fully pushed in)
+    // neutral_gap is the distance between centers at bias=0 (half a rect height apart)
+    float neutral_gap = rect_h * 0.5f;
+    // bias shifts from that neutral position: +bias pushes inner down (more overlap),
+    // -bias pulls inner up (less overlap)
+    int32_t inner_offset = static_cast<int32_t>(-neutral_gap + bias_ * neutral_gap);
 
-    // Outer rectangle (stationary, centered)
-    int32_t outer_top = cy - rect_h / 2;
-    int32_t outer_bot = cy + rect_h / 2;
+    // Outer rectangle (stationary, above center)
+    int32_t outer_top = cy - rect_h;
+    int32_t outer_bot = cy;
 
-    // Inner rectangle (slides vertically)
+    // Inner rectangle (slides vertically, below center at neutral)
     int32_t inner_cy = cy + inner_offset;
-    int32_t inner_top = inner_cy - rect_h / 2;
-    int32_t inner_bot = inner_cy + rect_h / 2;
+    int32_t inner_top = inner_cy;
+    int32_t inner_bot = inner_cy + rect_h;
 
     // Color based on abs(bias): green -> orange -> red
     float abs_bias = std::fabs(bias_);

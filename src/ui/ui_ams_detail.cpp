@@ -12,6 +12,7 @@
 #include "printer_detector.h"
 
 #include <algorithm>
+#include <cmath>
 #include <spdlog/spdlog.h>
 
 // ============================================================================
@@ -524,10 +525,14 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
             }
         }
     }
-    // HH sync feedback → fault state (compressed/tension = warning)
-    if (buffer_fault == 0 && info.type == AmsType::HAPPY_HARE) {
-        const auto& sf = info.sync_feedback_state;
-        if (sf == "compressed" || sf == "tension") {
+    // HH sync feedback → fault state based on bias magnitude
+    // Use same thresholds as buffer meter: <0.3 green, 0.3-0.7 orange, >0.7 red
+    if (buffer_fault == 0 && info.type == AmsType::HAPPY_HARE &&
+        info.sync_feedback_bias > -1.5f) {
+        float abs_bias = std::fabs(info.sync_feedback_bias);
+        if (abs_bias >= 0.7f) {
+            buffer_fault = 2;
+        } else if (abs_bias >= 0.3f) {
             buffer_fault = 1;
         }
     }

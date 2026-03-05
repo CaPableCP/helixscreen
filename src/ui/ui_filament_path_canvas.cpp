@@ -1326,7 +1326,7 @@ static void draw_buffer_coil(lv_layer_t* layer, int32_t cx, int32_t cy, int32_t 
         if (has_filament) {
             buf_bg = ph_blend(bg_color, filament_color, 0.33f);
         }
-    } else if (buffer_fault_state == 1 || buffer_state != 0) {
+    } else if (buffer_fault_state == 1) {
         border_color = lv_color_hex(0xF59E0B);
         if (has_filament) {
             buf_bg = ph_blend(bg_color, filament_color, 0.33f);
