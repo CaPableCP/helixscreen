@@ -203,6 +203,9 @@ void AmsOverviewPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 }
 
 void AmsOverviewPanel::on_activate() {
+    // Reset coalescing flag to prevent stale state from a previous deactivation
+    units_rebuild_pending_ = false;
+
     spdlog::debug("[{}] Activated - syncing from backend", get_name());
 
     AmsState::instance().sync_from_backend();

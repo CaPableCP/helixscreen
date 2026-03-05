@@ -101,14 +101,23 @@ void JobQueueModal::on_show() {
                 // lv_obj_clean() from corrupting the LVGL event linked list (issue #190).
                 if (!self->list_rebuild_pending_) {
                     self->list_rebuild_pending_ = true;
+                    struct RebuildCtx {
+                        std::weak_ptr<bool> alive;
+                        JobQueueModal* self;
+                    };
+                    auto* ctx = new RebuildCtx{self->alive_guard_, self};
                     lv_async_call([](void* data) {
-                        auto* modal = static_cast<JobQueueModal*>(data);
+                        auto* ctx = static_cast<RebuildCtx*>(data);
+                        auto guard = ctx->alive.lock();
+                        auto* modal = ctx->self;
+                        delete ctx;
+                        if (!guard || !*guard) return;
                         modal->list_rebuild_pending_ = false;
                         if (s_active_instance_ == modal) {
                             modal->populate_job_list();
                             modal->update_queue_state_ui();
                         }
-                    }, self);
+                    }, ctx);
                 }
             });
     }

@@ -27,6 +27,7 @@
 #include "lvgl/lvgl.h"
 #include "overlay_base.h"
 
+#include <memory>
 #include <string>
 
 // Forward declarations
@@ -208,6 +209,9 @@ class HardwareHealthOverlay : public OverlayBase {
 
     /// Save confirmation dialog
     lv_obj_t* hardware_save_dialog_{nullptr};
+
+    /// Guards lv_async_call callbacks from accessing a destroyed overlay
+    std::shared_ptr<bool> alive_guard_ = std::make_shared<bool>(true);
 
     //
     // === Static Callbacks ===

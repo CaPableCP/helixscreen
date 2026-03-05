@@ -114,14 +114,23 @@ void FanControlOverlay::on_activate() {
                 // lv_obj_clean() from corrupting the LVGL event linked list (issue #190).
                 if (!self->fans_rebuild_pending_) {
                     self->fans_rebuild_pending_ = true;
+                    struct RebuildCtx {
+                        std::weak_ptr<bool> alive;
+                        FanControlOverlay* self;
+                    };
+                    auto* ctx = new RebuildCtx{self->alive_guard_, self};
                     lv_async_call([](void* data) {
-                        auto* overlay = static_cast<FanControlOverlay*>(data);
+                        auto* ctx = static_cast<RebuildCtx*>(data);
+                        auto guard = ctx->alive.lock();
+                        auto* overlay = ctx->self;
+                        delete ctx;
+                        if (!guard || !*guard) return;
                         overlay->fans_rebuild_pending_ = false;
                         if (!overlay->is_visible() || !overlay->fans_container_) return;
                         overlay->unsubscribe_from_fan_speeds();
                         overlay->populate_fans();
                         overlay->subscribe_to_fan_speeds();
-                    }, self);
+                    }, ctx);
                 }
             });
     }
@@ -164,6 +173,8 @@ void FanControlOverlay::on_deactivate() {
 
 void FanControlOverlay::cleanup() {
     spdlog::debug("[{}] Cleanup", get_name());
+    // Invalidate alive guard so pending lv_async_call callbacks become no-ops
+    *alive_guard_ = false;
     // Clear observers first (they reference this object)
     fans_observer_.reset();
     anim_settings_observer_.reset();

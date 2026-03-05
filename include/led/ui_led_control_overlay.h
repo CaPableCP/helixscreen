@@ -8,6 +8,8 @@
 #include "overlay_base.h"
 #include "subject_managed_panel.h"
 
+#include <memory>
+
 namespace helix {
 class PrinterState;
 }
@@ -146,6 +148,10 @@ class LedControlOverlay : public OverlayBase {
     int current_brightness_ = 100;
     uint32_t current_color_ = 0xFFFFFF;
     LedBackendType selected_backend_type_ = LedBackendType::NATIVE;
+    bool strips_rebuild_pending_ = false; ///< Coalesces strip selector rebuild requests
+
+    /// Guards lv_async_call callbacks from accessing a destroyed overlay
+    std::shared_ptr<bool> alive_guard_ = std::make_shared<bool>(true);
 };
 
 } // namespace helix::led

@@ -7,6 +7,8 @@
 #include "ui_job_queue_modal.h"
 #include "ui_observer_guard.h"
 
+#include <memory>
+
 namespace helix {
 
 class JobQueueWidget : public PanelWidget {
@@ -32,6 +34,9 @@ class JobQueueWidget : public PanelWidget {
     ObserverGuard count_observer_;
     int current_size_mode_ = 1; // 0=compact, 1=normal, 2=expanded
     bool list_rebuild_pending_ = false; ///< Coalesces rapid count observer notifications
+
+    /// Guards lv_async_call callbacks from accessing a detached widget
+    std::shared_ptr<bool> alive_guard_ = std::make_shared<bool>(true);
 
     void rebuild_job_list();
 

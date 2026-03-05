@@ -373,6 +373,10 @@ void ControlsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 void ControlsPanel::on_activate() {
     active_ = true;
 
+    // Reset coalescing flags to prevent stale state from a previous deactivation
+    fans_rebuild_pending_ = false;
+    temps_rebuild_pending_ = false;
+
     // Force-refresh all displays so UI catches up on state changes missed while hidden
     refresh_all_displays();
 

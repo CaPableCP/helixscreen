@@ -95,12 +95,21 @@ void JobQueueWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
                 // lv_obj_clean() from corrupting the LVGL event linked list (issue #190).
                 if (!self->list_rebuild_pending_) {
                     self->list_rebuild_pending_ = true;
+                    struct RebuildCtx {
+                        std::weak_ptr<bool> alive;
+                        JobQueueWidget* self;
+                    };
+                    auto* ctx = new RebuildCtx{self->alive_guard_, self};
                     lv_async_call([](void* data) {
-                        auto* widget = static_cast<JobQueueWidget*>(data);
+                        auto* ctx = static_cast<RebuildCtx*>(data);
+                        auto guard = ctx->alive.lock();
+                        auto* widget = ctx->self;
+                        delete ctx;
+                        if (!guard || !*guard) return;
                         widget->list_rebuild_pending_ = false;
                         if (widget->job_list_container_)
                             widget->rebuild_job_list();
-                    }, self);
+                    }, ctx);
                 }
             });
     }
@@ -109,6 +118,9 @@ void JobQueueWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
 }
 
 void JobQueueWidget::detach() {
+    // Invalidate alive guard so pending lv_async_call callbacks become no-ops
+    *alive_guard_ = false;
+
     if (lv_is_initialized()) {
         count_observer_ = {};
     }

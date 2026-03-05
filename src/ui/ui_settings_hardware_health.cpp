@@ -51,6 +51,7 @@ HardwareHealthOverlay::HardwareHealthOverlay() {
 }
 
 HardwareHealthOverlay::~HardwareHealthOverlay() {
+    *alive_guard_ = false;
     spdlog::trace("[{}] Destroyed", get_name());
 }
 
@@ -323,11 +324,20 @@ void HardwareHealthOverlay::handle_hardware_action(const char* hardware_name, bo
         // this event is a child of the list being cleaned by populate_hardware_issues().
         // lv_async_call runs at the start of the next lv_timer_handler cycle when
         // event_head is guaranteed NULL, preventing LVGL event list corruption (issue #190).
+        struct RebuildCtx {
+            std::weak_ptr<bool> alive;
+            HardwareHealthOverlay* self;
+        };
+        auto* ctx = new RebuildCtx{alive_guard_, this};
         lv_async_call([](void* data) {
-            auto* self = static_cast<HardwareHealthOverlay*>(data);
+            auto* ctx = static_cast<RebuildCtx*>(data);
+            auto guard = ctx->alive.lock();
+            auto* self = ctx->self;
+            delete ctx;
+            if (!guard || !*guard) return;
             if (self->is_created() && self->is_visible())
                 self->populate_hardware_issues();
-        }, this);
+        }, ctx);
     } else {
         // "Save" - Add to expected hardware (with confirmation)
         // Close any existing dialog first (must happen before writing to static buffer)
@@ -373,11 +383,22 @@ void HardwareHealthOverlay::handle_hardware_save_confirm() {
     // SAFETY: Defer rebuild outside process_pending() for consistency with the Ignore path.
     // lv_async_call runs at the start of the next lv_timer_handler cycle when
     // event_head is guaranteed NULL, preventing LVGL event list corruption (issue #190).
-    lv_async_call([](void* data) {
-        auto* self = static_cast<HardwareHealthOverlay*>(data);
-        if (self->is_created() && self->is_visible())
-            self->populate_hardware_issues();
-    }, this);
+    {
+        struct RebuildCtx {
+            std::weak_ptr<bool> alive;
+            HardwareHealthOverlay* self;
+        };
+        auto* ctx = new RebuildCtx{alive_guard_, this};
+        lv_async_call([](void* data) {
+            auto* ctx = static_cast<RebuildCtx*>(data);
+            auto guard = ctx->alive.lock();
+            auto* self = ctx->self;
+            delete ctx;
+            if (!guard || !*guard) return;
+            if (self->is_created() && self->is_visible())
+                self->populate_hardware_issues();
+        }, ctx);
+    }
     pending_hardware_save_.clear();
 }
 

@@ -44,7 +44,7 @@ void NotificationManager::notification_history_clicked([[maybe_unused]] lv_event
     auto& mgr = NotificationManager::instance();
 
     // Prevent multiple panel instances - if panel already exists and is visible, ignore click
-    if (mgr.notification_panel_obj_ && lv_obj_is_valid(mgr.notification_panel_obj_) &&
+    if (mgr.notification_panel_obj_ &&
         !lv_obj_has_flag(mgr.notification_panel_obj_, LV_OBJ_FLAG_HIDDEN)) {
         spdlog::debug("[NotificationManager] Notification panel already visible, ignoring click");
         return;
@@ -58,17 +58,15 @@ void NotificationManager::notification_history_clicked([[maybe_unused]] lv_event
         panel.init_subjects();
     }
 
-    // Clean up old panel if it exists but is hidden/invalid.
+    // Clean up old panel if it exists but is hidden.
     // Use lv_obj_delete_async to schedule deletion for the next lv_timer_handler cycle
     // where event_head is guaranteed NULL, preventing lv_event_mark_deleted from
     // corrupting the LVGL event linked list (issue #190, previously #179).
-    if (mgr.notification_panel_obj_ && lv_obj_is_valid(mgr.notification_panel_obj_)) {
+    if (mgr.notification_panel_obj_) {
         lv_obj_t* old_panel = mgr.notification_panel_obj_;
         mgr.notification_panel_obj_ = nullptr;
         helix::ui::defocus_tree(old_panel);
         lv_obj_delete_async(old_panel);
-    } else {
-        mgr.notification_panel_obj_ = nullptr;
     }
 
     // Now create XML component
