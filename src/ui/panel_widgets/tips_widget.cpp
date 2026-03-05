@@ -81,6 +81,8 @@ void TipsWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     auto* tip_container = lv_obj_find_by_name(widget_obj_, "tip_container");
     if (tip_container) {
         lv_obj_set_user_data(tip_container, this);
+        // Pressed feedback: dim on touch
+        lv_obj_set_style_opa(tip_container, LV_OPA_70, LV_PART_MAIN | LV_STATE_PRESSED);
     }
 
     // Cache tip label for fade animation

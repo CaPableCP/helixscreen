@@ -85,6 +85,9 @@ void FanStackWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     *alive_ = true;
     lv_obj_set_user_data(widget_obj_, this);
 
+    // Pressed feedback: dim widget on touch
+    lv_obj_set_style_opa(widget_obj_, LV_OPA_70, LV_PART_MAIN | LV_STATE_PRESSED);
+
     if (is_carousel_mode()) {
         attach_carousel(widget_obj);
     } else {
