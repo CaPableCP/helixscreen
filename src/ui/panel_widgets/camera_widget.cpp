@@ -112,6 +112,14 @@ void CameraWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
 
     lv_obj_set_user_data(widget_obj_, this);
 
+    // ScopedFreeze may have discarded the queue_update() lambda that calls
+    // frame_consumed(), leaving the stream thread blocked on frame_pending_.
+    // Unblock it now — frame_consumed() is idempotent.
+    if (stream_ && stream_->is_running()) {
+        spdlog::trace("[CameraWidget] Unblocking stalled stream thread on reattach");
+        stream_->frame_consumed();
+    }
+
     // Observe printer_has_webcam — URLs may not be available yet at attach
     // time (Moonraker sends webcam list asynchronously). When the subject
     // transitions to 1, try starting the stream if we're active.
