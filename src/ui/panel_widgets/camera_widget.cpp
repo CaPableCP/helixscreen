@@ -184,6 +184,13 @@ void CameraWidget::start_stream() {
         return;
     }
 
+    // Ensure alive guard is valid — it may be stale (false) after a
+    // stop_stream() → detach() → reattach cycle where stop invalidated
+    // the old guard and detach preserved the (now-false) shared_ptr.
+    if (!alive_ || !*alive_) {
+        alive_ = std::make_shared<bool>(true);
+    }
+
     auto& state = get_printer_state();
     std::string stream_url = state.get_webcam_stream_url();
     std::string snapshot_url = state.get_webcam_snapshot_url();
