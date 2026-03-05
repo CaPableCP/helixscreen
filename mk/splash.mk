@@ -55,10 +55,15 @@ $(BUILD_DIR)/splash/%.o: src/%.cpp $(LIBHV_LIB) $(LIBHV_JSON_HEADER) | $(BUILD_D
 # on backlight at startup), and a UI notification stub (config.cpp calls ui_notification_error
 # on save failures). Note: both config.o and backlight_backend.o must be compiled separately with
 # HELIX_SPLASH_ONLY to skip runtime_config dependency (which pulls in main app symbols).
-SPLASH_EXTRA_OBJS := $(BUILD_DIR)/splash/config.o $(BUILD_DIR)/splash/backlight_backend.o $(BUILD_DIR)/splash/ui_notification_stub.o
+SPLASH_EXTRA_OBJS := $(BUILD_DIR)/splash/config.o $(BUILD_DIR)/splash/config_backup.o $(BUILD_DIR)/splash/backlight_backend.o $(BUILD_DIR)/splash/ui_notification_stub.o
 
 # Compile config for splash (with HELIX_SPLASH_ONLY to guard get_runtime_config dependency)
 $(BUILD_DIR)/splash/config.o: src/system/config.cpp $(LIBHV_LIB) $(LIBHV_JSON_HEADER) | $(BUILD_DIR)/splash
+	@echo "[CXX] $< (splash)"
+	$(Q)$(CXX) $(SPLASH_CXXFLAGS) $(DEPFLAGS) -c $< -o $@
+
+# Compile config_backup for splash (config.cpp references it)
+$(BUILD_DIR)/splash/config_backup.o: src/system/config_backup.cpp $(LIBHV_LIB) $(LIBHV_JSON_HEADER) | $(BUILD_DIR)/splash
 	@echo "[CXX] $< (splash)"
 	$(Q)$(CXX) $(SPLASH_CXXFLAGS) $(DEPFLAGS) -c $< -o $@
 
