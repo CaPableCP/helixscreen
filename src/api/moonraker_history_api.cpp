@@ -101,10 +101,22 @@ PrintHistoryJob parse_history_job(const json& job_json) {
         job.nozzle_temp = json_number_or(meta, "first_layer_extr_temp", 0.0);
         job.bed_temp = json_number_or(meta, "first_layer_bed_temp", 0.0);
 
-        // Thumbnail path (first available)
-        if (meta.contains("thumbnails") && meta["thumbnails"].is_array() &&
-            !meta["thumbnails"].empty()) {
-            job.thumbnail_path = meta["thumbnails"][0].value("relative_path", "");
+        // Parse all available thumbnails with dimensions
+        if (meta.contains("thumbnails") && meta["thumbnails"].is_array()) {
+            int best_pixels = 0;
+            for (const auto& t : meta["thumbnails"]) {
+                ThumbnailInfo info;
+                info.relative_path = t.value("relative_path", "");
+                info.width = t.value("width", 0);
+                info.height = t.value("height", 0);
+                if (!info.relative_path.empty()) {
+                    job.thumbnails.push_back(info);
+                    if (info.pixel_count() > best_pixels) {
+                        best_pixels = static_cast<int>(info.pixel_count());
+                        job.thumbnail_path = info.relative_path;
+                    }
+                }
+            }
         }
 
         // UUID and file size for precise history matching

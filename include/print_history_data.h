@@ -3,8 +3,11 @@
 
 #pragma once
 
+#include "moonraker_types.h"
+
 #include <cstdint>
 #include <string>
+#include <vector>
 
 /**
  * @brief Time filter for history dashboard queries
@@ -45,7 +48,8 @@ struct PrintHistoryJob {
     double layer_height = 0.0;
     double nozzle_temp = 0.0;
     double bed_temp = 0.0;
-    std::string thumbnail_path; ///< Path to cached thumbnail
+    std::string thumbnail_path;                ///< Largest thumbnail relative path (for simple consumers)
+    std::vector<ThumbnailInfo> thumbnails;     ///< All available thumbnails with dimensions
     std::string uuid;           ///< Slicer-generated UUID (from metadata.uuid)
     size_t size_bytes = 0;      ///< File size in bytes (from metadata.size)
 

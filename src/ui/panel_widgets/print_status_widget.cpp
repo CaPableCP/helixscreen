@@ -17,6 +17,7 @@
 #include "runtime_config.h"
 #include "thumbnail_cache.h"
 #include "thumbnail_load_context.h"
+#include "thumbnail_processor.h"
 
 #include <spdlog/spdlog.h>
 
@@ -324,8 +325,36 @@ std::string PrintStatusWidget::get_last_print_thumbnail_path() const {
         return {};
     }
 
-    // Most recent job is first (sorted by start_time DESC)
-    return jobs.front().thumbnail_path;
+    const auto& job = jobs.front();
+
+    // Select the best thumbnail for the widget's actual rendered size
+    if (!job.thumbnails.empty() && print_card_thumb_ && lv_obj_is_valid(print_card_thumb_)) {
+        int target_w = lv_obj_get_width(print_card_thumb_);
+        int target_h = lv_obj_get_height(print_card_thumb_);
+
+        // Find smallest thumbnail that meets or exceeds the widget dimensions
+        const ThumbnailInfo* best_adequate = nullptr;
+        const ThumbnailInfo* largest = &job.thumbnails[0];
+
+        for (const auto& t : job.thumbnails) {
+            if (t.pixel_count() > largest->pixel_count()) {
+                largest = &t;
+            }
+            if (t.width >= target_w && t.height >= target_h) {
+                if (!best_adequate || t.pixel_count() < best_adequate->pixel_count()) {
+                    best_adequate = &t;
+                }
+            }
+        }
+
+        const auto* best = best_adequate ? best_adequate : largest;
+        spdlog::debug("[PrintStatusWidget] Widget {}x{}, selected thumbnail {}x{} ({})",
+                      target_w, target_h, best->width, best->height, best->relative_path);
+        return best->relative_path;
+    }
+
+    // Fallback: use pre-selected largest thumbnail
+    return job.thumbnail_path;
 }
 
 void PrintStatusWidget::reset_print_card_to_idle() {
@@ -345,12 +374,14 @@ void PrintStatusWidget::reset_print_card_to_idle() {
         return;
     }
 
-    // Use detail-sized thumbnail for the print status card (200-400px depending on display)
-    auto detail_target = helix::ThumbnailProcessor::get_target_for_display(
-        helix::ThumbnailSize::Detail);
+    // Compute pre-scale target from actual widget size (not hardcoded breakpoints)
+    int widget_w = lv_obj_get_width(print_card_thumb_);
+    int widget_h = lv_obj_get_height(print_card_thumb_);
+    auto target = helix::ThumbnailProcessor::get_target_for_resolution(
+        widget_w, widget_h, helix::ThumbnailSize::Detail);
 
     // Check if we already have a pre-scaled BIN version
-    auto cached = get_thumbnail_cache().get_if_optimized(thumb_rel_path, detail_target);
+    auto cached = get_thumbnail_cache().get_if_optimized(thumb_rel_path, target);
     if (!cached.empty()) {
         lv_image_set_src(print_card_thumb_, cached.c_str());
         spdlog::debug("[PrintStatusWidget] Idle thumbnail from cache: {}", cached);
@@ -369,11 +400,12 @@ void PrintStatusWidget::reset_print_card_to_idle() {
 
     // Use alive guard to prevent use-after-free if widget is destroyed during fetch [L072]
     lv_obj_t* thumb_widget = print_card_thumb_;
-    auto ctx = ThumbnailLoadContext::create(alive_);
+    std::weak_ptr<std::atomic<bool>> weak_alive = alive_;
 
-    get_thumbnail_cache().fetch_for_detail_view(
-        api, thumb_rel_path, ctx,
-        [thumb_widget](const std::string& lvgl_path) {
+    get_thumbnail_cache().fetch_optimized(
+        api, thumb_rel_path, target,
+        [thumb_widget, weak_alive](const std::string& lvgl_path) {
+            if (weak_alive.expired()) return;
             helix::ui::queue_update<std::string>(
                 std::make_unique<std::string>(lvgl_path),
                 [thumb_widget](std::string* path) {
