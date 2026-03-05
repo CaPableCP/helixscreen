@@ -103,6 +103,7 @@ class PowerPanel : public PanelBase {
     void populate_device_chips();
     void populate_device_chips_impl();
     void handle_chip_clicked(const std::string& device_name);
+    bool chips_rebuild_pending_ = false; ///< Coalesces chip rebuild requests
 
     // Setup helpers
     void fetch_devices();

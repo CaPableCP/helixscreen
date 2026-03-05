@@ -319,9 +319,15 @@ void HardwareHealthOverlay::handle_hardware_action(const char* hardware_name, bo
         if (printer_state_) {
             printer_state_->remove_hardware_issue(hw_name);
         }
-        // SAFETY: Defer rebuild — the Ignore button that fired this event is a child
-        // of the list being cleaned by populate_hardware_issues() (issue #80).
-        helix::ui::queue_update([this]() { populate_hardware_issues(); });
+        // SAFETY: Defer rebuild outside process_pending() — the Ignore button that fired
+        // this event is a child of the list being cleaned by populate_hardware_issues().
+        // lv_async_call runs at the start of the next lv_timer_handler cycle when
+        // event_head is guaranteed NULL, preventing LVGL event list corruption (issue #190).
+        lv_async_call([](void* data) {
+            auto* self = static_cast<HardwareHealthOverlay*>(data);
+            if (self->is_created() && self->is_visible())
+                self->populate_hardware_issues();
+        }, this);
     } else {
         // "Save" - Add to expected hardware (with confirmation)
         // Close any existing dialog first (must happen before writing to static buffer)
@@ -364,8 +370,14 @@ void HardwareHealthOverlay::handle_hardware_save_confirm() {
     if (printer_state_) {
         printer_state_->remove_hardware_issue(pending_hardware_save_);
     }
-    // SAFETY: Defer rebuild for consistency with the Ignore path (issue #80).
-    helix::ui::queue_update([this]() { populate_hardware_issues(); });
+    // SAFETY: Defer rebuild outside process_pending() for consistency with the Ignore path.
+    // lv_async_call runs at the start of the next lv_timer_handler cycle when
+    // event_head is guaranteed NULL, preventing LVGL event list corruption (issue #190).
+    lv_async_call([](void* data) {
+        auto* self = static_cast<HardwareHealthOverlay*>(data);
+        if (self->is_created() && self->is_visible())
+            self->populate_hardware_issues();
+    }, this);
     pending_hardware_save_.clear();
 }
 

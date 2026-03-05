@@ -90,7 +90,19 @@ void JobQueueWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     auto* count_subj = lv_xml_get_subject(nullptr, "job_queue_count");
     if (count_subj) {
         count_observer_ = helix::ui::observe_int_sync<JobQueueWidget>(
-            count_subj, this, [](JobQueueWidget* self, int /*count*/) { self->rebuild_job_list(); });
+            count_subj, this, [](JobQueueWidget* self, int /*count*/) {
+                // Use lv_async_call to defer the rebuild outside process_pending(), preventing
+                // lv_obj_clean() from corrupting the LVGL event linked list (issue #190).
+                if (!self->list_rebuild_pending_) {
+                    self->list_rebuild_pending_ = true;
+                    lv_async_call([](void* data) {
+                        auto* widget = static_cast<JobQueueWidget*>(data);
+                        widget->list_rebuild_pending_ = false;
+                        if (widget->job_list_container_)
+                            widget->rebuild_job_list();
+                    }, self);
+                }
+            });
     }
 
     spdlog::debug("[JobQueueWidget] Attached");

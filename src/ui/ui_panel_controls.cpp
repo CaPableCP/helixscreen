@@ -507,8 +507,18 @@ void ControlsPanel::register_observers() {
     // Skip widget rebuilds when hidden; on_activate() calls populate_secondary_fans()
     fans_version_observer_ = observe_int_sync<ControlsPanel>(
         printer_state_.get_fans_version_subject(), this, [](ControlsPanel* self, int /* version */) {
-            if (self->active_)
-                self->populate_secondary_fans();
+            if (!self->active_) return;
+            // Use lv_async_call to defer the rebuild outside process_pending(), preventing
+            // lv_obj_clean() from corrupting the LVGL event linked list (issue #190).
+            if (!self->fans_rebuild_pending_) {
+                self->fans_rebuild_pending_ = true;
+                lv_async_call([](void* data) {
+                    auto* panel = static_cast<ControlsPanel*>(data);
+                    panel->fans_rebuild_pending_ = false;
+                    if (panel->active_ && panel->secondary_fans_list_)
+                        panel->populate_secondary_fans();
+                }, self);
+            }
         });
 
     // Subscribe to active tool changes for dynamic nozzle label
@@ -525,8 +535,18 @@ void ControlsPanel::register_observers() {
     temp_sensor_count_observer_ = observe_int_sync<ControlsPanel>(
         helix::sensors::TemperatureSensorManager::instance().get_sensor_count_subject(), this,
         [](ControlsPanel* self, int /* count */) {
-            if (self->active_)
-                self->populate_secondary_temps();
+            if (!self->active_) return;
+            // Use lv_async_call to defer the rebuild outside process_pending(), preventing
+            // lv_obj_clean() from corrupting the LVGL event linked list (issue #190).
+            if (!self->temps_rebuild_pending_) {
+                self->temps_rebuild_pending_ = true;
+                lv_async_call([](void* data) {
+                    auto* panel = static_cast<ControlsPanel*>(data);
+                    panel->temps_rebuild_pending_ = false;
+                    if (panel->active_ && panel->secondary_temps_list_)
+                        panel->populate_secondary_temps();
+                }, self);
+            }
         });
 
     // Subscribe to pending Z-offset delta (for unsaved adjustment banner)

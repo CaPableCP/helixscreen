@@ -97,8 +97,19 @@ void JobQueueModal::on_show() {
     if (count_subj) {
         count_observer_ = helix::ui::observe_int_sync<JobQueueModal>(
             count_subj, this, [](JobQueueModal* self, int /*count*/) {
-                self->populate_job_list();
-                self->update_queue_state_ui();
+                // Use lv_async_call to defer the rebuild outside process_pending(), preventing
+                // lv_obj_clean() from corrupting the LVGL event linked list (issue #190).
+                if (!self->list_rebuild_pending_) {
+                    self->list_rebuild_pending_ = true;
+                    lv_async_call([](void* data) {
+                        auto* modal = static_cast<JobQueueModal*>(data);
+                        modal->list_rebuild_pending_ = false;
+                        if (s_active_instance_ == modal) {
+                            modal->populate_job_list();
+                            modal->update_queue_state_ui();
+                        }
+                    }, self);
+                }
             });
     }
 

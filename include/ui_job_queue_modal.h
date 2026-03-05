@@ -49,6 +49,7 @@ class JobQueueModal : public Modal {
 
     // Observer for auto-refresh when queue data changes
     ObserverGuard count_observer_;
+    bool list_rebuild_pending_ = false; ///< Coalesces rapid count observer notifications
 
     // Async callback safety
     std::shared_ptr<bool> alive_guard_ = std::make_shared<bool>(true);

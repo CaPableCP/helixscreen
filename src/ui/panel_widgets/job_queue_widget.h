@@ -31,6 +31,7 @@ class JobQueueWidget : public PanelWidget {
 
     ObserverGuard count_observer_;
     int current_size_mode_ = 1; // 0=compact, 1=normal, 2=expanded
+    bool list_rebuild_pending_ = false; ///< Coalesces rapid count observer notifications
 
     void rebuild_job_list();
 

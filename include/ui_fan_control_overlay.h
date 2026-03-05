@@ -185,6 +185,7 @@ class FanControlOverlay : public OverlayBase {
     ObserverGuard fans_observer_;                    ///< Structural changes (fan discovery)
     std::vector<ObserverGuard> fan_speed_observers_; ///< Per-fan speed changes
     ObserverGuard anim_settings_observer_;           ///< Animation settings changes
+    bool fans_rebuild_pending_ = false; ///< Coalesces rapid fans_version observer notifications
 
     //
     // === Fan Icon Spin Animation ===

@@ -59,17 +59,14 @@ void NotificationManager::notification_history_clicked([[maybe_unused]] lv_event
     }
 
     // Clean up old panel if it exists but is hidden/invalid.
-    // Defer deletion to avoid destroying objects during input event processing,
-    // which can trigger lv_event_mark_deleted on a corrupt event chain (issue #179).
+    // Use lv_obj_delete_async to schedule deletion for the next lv_timer_handler cycle
+    // where event_head is guaranteed NULL, preventing lv_event_mark_deleted from
+    // corrupting the LVGL event linked list (issue #190, previously #179).
     if (mgr.notification_panel_obj_ && lv_obj_is_valid(mgr.notification_panel_obj_)) {
         lv_obj_t* old_panel = mgr.notification_panel_obj_;
         mgr.notification_panel_obj_ = nullptr;
-        helix::ui::queue_update([old_panel]() {
-            if (lv_obj_is_valid(old_panel)) {
-                helix::ui::defocus_tree(old_panel);
-                lv_obj_delete(old_panel);
-            }
-        });
+        helix::ui::defocus_tree(old_panel);
+        lv_obj_delete_async(old_panel);
     } else {
         mgr.notification_panel_obj_ = nullptr;
     }

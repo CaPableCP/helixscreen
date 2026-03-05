@@ -209,6 +209,9 @@ class ControlsPanel : public PanelBase {
     ObserverGuard fans_version_observer_;      // Multi-fan list changes
     ObserverGuard temp_sensor_count_observer_; // Temp sensor list changes
 
+    bool fans_rebuild_pending_ = false;  ///< Coalesces rapid fans_version observer notifications
+    bool temps_rebuild_pending_ = false; ///< Coalesces rapid temp_sensor_count observer notifications
+
     //
     // === Lazily-Created Child Panels ===
     //

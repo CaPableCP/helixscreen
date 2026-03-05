@@ -123,14 +123,33 @@ void PowerPanel::fetch_devices() {
     PowerPanel* self_ptr = this;
     api_->get_power_devices(
         [weak_alive, self_ptr](const std::vector<PowerDevice>& devices) {
-            // Marshal onto UI thread — API callbacks fire on a background thread
-            helix::ui::queue_update([weak_alive, self_ptr, devices]() {
+            // Marshal onto UI thread — API callbacks fire on a background thread.
+            // Use a shared_ptr to carry devices through two deferred hops:
+            // 1. queue_update: arrives on UI thread (still inside process_pending)
+            // 2. lv_async_call: defers widget deletion to the next lv_timer_handler
+            //    cycle where event_head is guaranteed NULL (issue #190).
+            auto devices_ptr = std::make_shared<std::vector<PowerDevice>>(devices);
+            helix::ui::queue_update([weak_alive, self_ptr, devices_ptr]() {
                 auto alive = weak_alive.lock();
                 if (!alive || !*alive)
                     return;
                 spdlog::info("[{}] Received {} power devices", self_ptr->get_name(),
-                             devices.size());
-                self_ptr->populate_device_list(devices);
+                             devices_ptr->size());
+                // Further defer the actual populate (which calls safe_delete) to avoid
+                // corrupting the LVGL event linked list while process_pending() is running.
+                struct AsyncCtx {
+                    std::weak_ptr<std::atomic<bool>> weak_alive;
+                    PowerPanel* self;
+                    std::shared_ptr<std::vector<PowerDevice>> devices;
+                };
+                auto* ctx = new AsyncCtx{weak_alive, self_ptr, devices_ptr};
+                lv_async_call([](void* data) {
+                    auto* ctx = static_cast<AsyncCtx*>(data);
+                    auto alive = ctx->weak_alive.lock();
+                    if (alive && *alive)
+                        ctx->self->populate_device_list(*ctx->devices);
+                    delete ctx;
+                }, ctx);
             });
         },
         [weak_alive, self_ptr](const MoonrakerError& err) {
@@ -412,8 +431,17 @@ void PowerPanel::populate_device_chips() {
     if (!chip_container_)
         return;
 
-    // Defer to avoid re-entrancy from chip click handler
-    helix::ui::queue_update([this]() { populate_device_chips_impl(); });
+    // Use lv_async_call to defer outside process_pending(), preventing lv_obj_clean()
+    // from corrupting the LVGL event linked list during chip rebuild (issue #190).
+    if (!chips_rebuild_pending_) {
+        chips_rebuild_pending_ = true;
+        lv_async_call([](void* data) {
+            auto* self = static_cast<PowerPanel*>(data);
+            self->chips_rebuild_pending_ = false;
+            if (self->chip_container_)
+                self->populate_device_chips_impl();
+        }, this);
+    }
 }
 
 void PowerPanel::populate_device_chips_impl() {

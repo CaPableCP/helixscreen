@@ -111,8 +111,21 @@ void AmsOverviewPanel::init_subjects() {
                                                        // count changed. Per-slot observers drive
                                                        // all visual state (color, pulse, etc.)
                                                        self->refresh_detail_if_needed();
-                                                   } else {
-                                                       self->refresh_units();
+                                                       return;
+                                                   }
+                                                   // Use lv_async_call to defer the rebuild
+                                                   // outside process_pending(), preventing
+                                                   // lv_obj_clean() from corrupting the LVGL
+                                                   // event linked list (issue #190).
+                                                   if (!self->units_rebuild_pending_) {
+                                                       self->units_rebuild_pending_ = true;
+                                                       lv_async_call([](void* data) {
+                                                           auto* panel = static_cast<AmsOverviewPanel*>(data);
+                                                           panel->units_rebuild_pending_ = false;
+                                                           if (panel->panel_ && panel->cards_row_ &&
+                                                               panel->detail_unit_index_ < 0)
+                                                               panel->refresh_units();
+                                                       }, self);
                                                    }
                                                });
 

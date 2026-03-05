@@ -109,11 +109,19 @@ void FanControlOverlay::on_activate() {
     if (auto* fans_ver = printer_state_.get_fans_version_subject()) {
         fans_observer_ = observe_int_sync<FanControlOverlay>(
             fans_ver, this, [](FanControlOverlay* self, int /* version */) {
-                if (self->is_visible()) {
-                    // Structural change - unsubscribe before rebuild to avoid dangling observers
-                    self->unsubscribe_from_fan_speeds();
-                    self->populate_fans();
-                    self->subscribe_to_fan_speeds();
+                if (!self->is_visible()) return;
+                // Use lv_async_call to defer the rebuild outside process_pending(), preventing
+                // lv_obj_clean() from corrupting the LVGL event linked list (issue #190).
+                if (!self->fans_rebuild_pending_) {
+                    self->fans_rebuild_pending_ = true;
+                    lv_async_call([](void* data) {
+                        auto* overlay = static_cast<FanControlOverlay*>(data);
+                        overlay->fans_rebuild_pending_ = false;
+                        if (!overlay->is_visible() || !overlay->fans_container_) return;
+                        overlay->unsubscribe_from_fan_speeds();
+                        overlay->populate_fans();
+                        overlay->subscribe_to_fan_speeds();
+                    }, self);
                 }
             });
     }

@@ -1124,7 +1124,8 @@ void LedControlOverlay::refresh_wled_status() {
         // poll_status callback fires on the libhv background thread —
         // all LVGL operations must be deferred to the UI thread.
         helix::ui::queue_update([this]() {
-            if (cleanup_called()) return;
+            if (cleanup_called())
+                return;
             if (wled_presets_container_) {
                 lv_obj_clean(wled_presets_container_);
                 populate_wled();
