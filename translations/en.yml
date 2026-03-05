@@ -118,12 +118,14 @@ translations:
   Are you sure? This will power off or restart the printer host.: Are you sure? This will power off or restart the printer host.
   Assign Klipper macros to control LEDs via on/off, toggle, or presets: Assign Klipper macros to control LEDs via on/off, toggle, or presets
   Assign a role to enable sensor monitoring: Assign a role to enable sensor monitoring
+  Assisting: Assisting
   Auto: Auto
   Auto Bed Mesh: Auto Bed Mesh
   Auto-Detect: Auto-Detect
   Auto-Heat on Load: Auto-Heat on Load
   Auto-probe or manually check screw heights: Auto-probe or manually check screw heights
   Auto-render video: Auto-render video
+  Automatic: Automatic
   Automatic Heater Control (PID) Calibration: Automatic Heater Control (PID) Calibration
   Automatic Heater Control Calibration: Automatic Heater Control Calibration
   Automatic LED Control: Automatic LED Control
@@ -159,6 +161,7 @@ translations:
   Border transparency (0 = invisible, 255 = solid): Border transparency (0 = invisible, 255 = solid)
   Both: Both
   Brightness: Brightness
+  Brightness level when LEDs turn on at startup: Brightness level when LEDs turn on at startup
   Browse: Browse
   Buffer Status: Buffer Status
   Buffer information not available for this backend: Buffer information not available for this backend
@@ -226,6 +229,7 @@ translations:
   Clear Spool: Clear Spool
   Clipboard unavailable - use SSH: Clipboard unavailable - use SSH
   Clog Detection: Clog Detection
+  Clog detection: Clog detection
   Close: Close
   Closer: Closer
   Closer = more squish | Farther = less squish: Closer = more squish | Farther = less squish
@@ -457,6 +461,7 @@ translations:
   Farther: Farther
   Fault Detection: Fault Detection
   Feed filament directly to extruder: Feed filament directly to extruder
+  Feeding filament forward: Feeding filament forward
   Filament: Filament
   Filament Detected: Filament Detected
   Filament Sensor: Filament Sensor
@@ -466,8 +471,11 @@ translations:
   Filament by Type: Filament by Type
   Filament clog/flow detection meter: Filament clog/flow detection meter
   Filament diameter sensors for flow compensation: Filament diameter sensors for flow compensation
+  Filament is loose: Filament is loose
+  Filament is pulling tight: Filament is pulling tight
   Filament runout and motion detection sensors: Filament runout and motion detection sensors
   Filament runout detection status: Filament runout detection status
+  Filament tension is balanced: Filament tension is balanced
   Filament tracking and inventory: Filament tracking and inventory
   Filament width sensor readings: Filament width sensor readings
   File: File
@@ -478,6 +486,7 @@ translations:
   Firmware Restart: Firmware Restart
   Firmware restarting...: Firmware restarting...
   Flat Concentric Rings (existing ams_slot): Flat Concentric Rings (existing ams_slot)
+  Flow: Flow
   Flow Rate: Flow Rate
   Flowguard: Flowguard
   Flying Toasters: Flying Toasters
@@ -489,6 +498,7 @@ translations:
   G-code Preview: G-code Preview
   G-code commands will appear here: G-code commands will appear here
   GCode Console: GCode Console
+  Gear sync: Gear sync
   Get help and share feedback: Get help and share feedback
   'Ghost:': 'Ghost:'
   Got it: Got it
@@ -831,6 +841,7 @@ translations:
   PRINTER: PRINTER
   Paper Test Calibration: Paper Test Calibration
   Parameters: Parameters
+  Part: Part
   Part Cooling Fan: Part Cooling Fan
   Part Fan: Part Fan
   Part, hotend, and auxiliary fan speeds: Part, hotend, and auxiliary fan speeds
@@ -875,6 +886,7 @@ translations:
   Preparing...: Preparing...
   Preset: Preset
   Presets: Presets
+  'Pressure:': 'Pressure:'
   Previous: Previous
   Price: Price
   Primary: Primary
@@ -931,6 +943,7 @@ translations:
   Profile name (e.g., default): Profile name (e.g., default)
   Profiles: Profiles
   Progress Bar Tests: Progress Bar Tests
+  Pulling filament back: Pulling filament back
   Purge: Purge
   Purging nozzle: Purging nozzle
   Purging...: Purging...
@@ -1007,6 +1020,7 @@ translations:
   Retry: Retry
   Review detected hardware validation issues: Review detected hardware validation issues
   Review your changes: Review your changes
+  Rewinding: Rewinding
   'Role:': 'Role:'
   Rotating tips and helpful information: Rotating tips and helpful information
   'Rotation: %d\xc2\xb0 - %ds remaining (or wait to retry)': 'Rotation: %d\xc2\xb0 - %ds remaining (or wait to retry)'
@@ -1121,6 +1135,7 @@ translations:
   Spool Weight (g): Spool Weight (g)
   Spool created successfully: Spool created successfully
   Spool deleted: Spool deleted
+  Spool motor: Spool motor
   Spool saved: Spool saved
   Spool wt (g): Spool wt (g)
   Spoolman: Spoolman
@@ -1139,6 +1154,7 @@ translations:
   Started: Started
   Starting Print...: Starting Print...
   Starting...: Starting...
+  Startup Brightness: Startup Brightness
   Startup, auto-control, and macro devices: Startup, auto-control, and macro devices
   State: State
   Status: Status
@@ -1382,6 +1398,7 @@ translations:
   not detected: not detected
   of: of
   prints: prints
+  remaining before clog detection triggers: remaining before clog detection triggers
   set to: set to
   started: started
   tall: tall
