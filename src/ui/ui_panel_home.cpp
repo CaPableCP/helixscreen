@@ -127,6 +127,15 @@ void HomePanel::setup_widget_gate_observers() {
             spdlog::debug("[{}] Skipping gate rebuild during edit mode", get_name());
             return;
         }
+        // Skip if any widget has a fullscreen overlay open — detach() would
+        // destroy the overlay LVGL objects mid-display (camera fullscreen).
+        for (const auto& w : active_widgets_) {
+            if (w->has_overlay_open()) {
+                spdlog::debug("[{}] Skipping gate rebuild while widget '{}' has overlay open",
+                              get_name(), w->id());
+                return;
+            }
+        }
         populate_widgets(/*force=*/false);
     });
 }

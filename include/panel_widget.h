@@ -61,6 +61,11 @@ class PanelWidget {
         (void)height_px;
     }
 
+    /// Whether this widget currently has an overlay open (e.g. fullscreen camera).
+    /// Gate observer rebuilds must not run while an overlay is open — detach()
+    /// would destroy the overlay's LVGL objects mid-display.
+    virtual bool has_overlay_open() const { return false; }
+
     /// Whether this widget's C++ instance can be reused across rebuilds.
     /// When true, detach() must be lightweight (clear LVGL pointers only),
     /// preserving expensive state like camera streams. The destructor

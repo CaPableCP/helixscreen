@@ -25,6 +25,7 @@ class CameraWidget : public PanelWidget {
     void on_activate() override;
     void on_deactivate() override;
     void on_size_changed(int colspan, int rowspan, int width_px, int height_px) override;
+    bool has_overlay_open() const override { return fullscreen_overlay_ != nullptr; }
 
     /// Open/close fullscreen camera overlay
     void open_fullscreen();

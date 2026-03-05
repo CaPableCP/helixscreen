@@ -133,8 +133,15 @@ void CameraWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
                     self->start_stream();
                 }
             } else {
-                self->stop_stream();
-                self->set_status_text("No Camera");
+                // Only stop if the stream isn't being actively displayed.
+                // observe_int_sync defers via queue_update(), so this callback can
+                // fire AFTER on_activate() already restarted the stream — killing it
+                // and leaving a gray rectangle. Also skip if fullscreen overlay is
+                // open — the stream must keep running for the fullscreen view.
+                if (!self->active_ && !self->fullscreen_overlay_) {
+                    self->stop_stream();
+                    self->set_status_text("No Camera");
+                }
             }
         });
     }
@@ -168,6 +175,7 @@ void CameraWidget::detach() {
 }
 
 void CameraWidget::on_activate() {
+    spdlog::debug("[CameraWidget] on_activate (was active={})", active_);
     active_ = true;
 
     // Register for display sleep/wake notifications to suspend the camera
@@ -179,9 +187,13 @@ void CameraWidget::on_activate() {
             auto alive = weak_alive.lock();
             if (!alive || !*alive) return;
             if (sleeping) {
-                spdlog::debug("[CameraWidget] Display sleeping — stopping camera stream");
-                stop_stream();
-            } else if (active_) {
+                // Don't stop the stream if fullscreen overlay is open — the
+                // user is actively viewing the camera feed.
+                if (!fullscreen_overlay_) {
+                    spdlog::debug("[CameraWidget] Display sleeping — stopping camera stream");
+                    stop_stream();
+                }
+            } else if (active_ || fullscreen_overlay_) {
                 spdlog::debug("[CameraWidget] Display waking — restarting camera stream");
                 start_stream();
             }
@@ -193,6 +205,8 @@ void CameraWidget::on_activate() {
 }
 
 void CameraWidget::on_deactivate() {
+    spdlog::debug("[CameraWidget] on_deactivate (was active={}, fullscreen={})",
+                  active_, fullscreen_overlay_ != nullptr);
     active_ = false;
     // Don't stop the stream if fullscreen is open — we're still showing frames
     if (!fullscreen_overlay_) {
@@ -210,6 +224,7 @@ void CameraWidget::on_size_changed(int /*colspan*/, int /*rowspan*/, int /*width
 
 void CameraWidget::start_stream() {
     if (stream_ && stream_->is_running()) {
+        spdlog::debug("[CameraWidget] start_stream: already running, skipping");
         return;
     }
 
@@ -225,7 +240,7 @@ void CameraWidget::start_stream() {
     std::string snapshot_url = state.get_webcam_snapshot_url();
 
     if (stream_url.empty() && snapshot_url.empty()) {
-        // URLs not available yet — observer will retry when they arrive
+        spdlog::debug("[CameraWidget] start_stream: no URLs available yet, waiting for observer");
         return;
     }
 
@@ -247,6 +262,13 @@ void CameraWidget::start_stream() {
     }
 
     set_status_text("Connecting Camera...");
+
+    // Unhide the overlay so the user sees "Connecting Camera..." instead of
+    // a bare gray rectangle. The overlay was hidden when the previous stream's
+    // first frame arrived — we need to re-show it for the new connection attempt.
+    if (camera_overlay_) {
+        lv_obj_remove_flag(camera_overlay_, LV_OBJ_FLAG_HIDDEN);
+    }
 
     stream_ = std::make_unique<CameraStream>();
     stream_->set_flip(state.get_webcam_flip_horizontal(), state.get_webcam_flip_vertical());
@@ -298,8 +320,10 @@ void CameraWidget::start_stream() {
 
 void CameraWidget::stop_stream() {
     if (!stream_) {
+        spdlog::trace("[CameraWidget] stop_stream: no stream to stop");
         return;
     }
+    spdlog::debug("[CameraWidget] stop_stream: stopping active stream (active={})", active_);
 
     // Invalidate alive guard FIRST — queued UI callbacks check this and
     // become no-ops, preventing use-after-free on freed draw buffers
