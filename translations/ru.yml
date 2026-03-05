@@ -1117,7 +1117,7 @@ translations:
   Size: Размер
   Skip: Пропустить
   Sleep While Printing: Спящий режим при печати
-  Sleep timeout adjusted: Таймаут сна изменён
+  Sleep adjusted to match dim timeout: Таймаут сна изменён
   Slot 1: Слот 1
   Small labels help keep controls calm and focused.: Мелкие надписи помогают сохранять элементы управления аккуратными.
   Some settings will take effect after restart.: Некоторые настройки вступят в силу после перезапуска.
