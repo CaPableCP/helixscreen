@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ui_effects.h"
+#include "ui_update_queue.h"
 
 #include "lvgl/lvgl.h"
 #include "static_panel_registry.h"
@@ -148,6 +149,35 @@ inline bool safe_delete(lv_obj_t*& obj) {
     lv_obj_delete(obj);
     obj = nullptr;
     return true;
+}
+
+/**
+ * @brief Queue LVGL object deletion for the next frame
+ *
+ * Immediately nullifies the pointer to prevent further use, then queues
+ * the actual deletion via UpdateQueue. This prevents crashes when deleting
+ * objects that have pending timer events or are referenced by in-flight
+ * event processing (e.g., spinners with animation timers).
+ *
+ * @param obj Reference to pointer to the LVGL object (set to nullptr immediately)
+ */
+inline void safe_delete_deferred(lv_obj_t*& obj) {
+    if (!obj)
+        return;
+    lv_obj_t* to_delete = obj;
+    obj = nullptr;
+    queue_update([to_delete]() {
+        if (!lv_is_initialized())
+            return;
+        if (!lv_display_get_next(nullptr))
+            return;
+        if (StaticPanelRegistry::is_destroying_all())
+            return;
+        if (!lv_obj_is_valid(to_delete))
+            return;
+        defocus_tree(to_delete);
+        lv_obj_delete(to_delete);
+    });
 }
 
 // ============================================================================

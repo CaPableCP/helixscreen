@@ -367,6 +367,11 @@ void WizardWifiStep::clear_network_list() {
 
     spdlog::debug("[{}] Clearing network list", get_name());
 
+    // Freeze queue to prevent background thread from enqueueing callbacks
+    // targeting children we're about to delete
+    auto freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
+    helix::ui::UpdateQueue::instance().drain();
+
     int32_t child_count = static_cast<int32_t>(lv_obj_get_child_count(network_list_container_));
     spdlog::debug("[{}] Network list has {} children", get_name(), child_count);
 
@@ -500,8 +505,16 @@ void WizardWifiStep::handle_wifi_toggle_changed(lv_event_t* e) {
                     return;
                 }
 
-                lv_subject_set_int(&self->wifi_scanning_, 0);
-                self->populate_network_list(networks);
+                self->cached_networks_ = networks;
+                // Marshal to UI thread — scan callback runs on background thread.
+                // queue_widget_update guards against screen_root_ being destroyed.
+                helix::ui::queue_widget_update(self->screen_root_, [self](lv_obj_t*) {
+                    if (self->cleanup_called_) {
+                        return;
+                    }
+                    lv_subject_set_int(&self->wifi_scanning_, 0);
+                    self->populate_network_list(self->cached_networks_);
+                });
             });
         } else {
             LOG_ERROR_INTERNAL("WiFi manager not initialized");
@@ -837,24 +850,20 @@ void WizardWifiStep::init_wifi_manager() {
                     return;
                 }
 
-                lv_subject_set_int(&wifi_scanning_, 0);
-                if (!networks.empty()) {
-                    // Use lv_async_call to update UI on main thread
-                    // Store networks temporarily for the async call
-                    cached_networks_ = networks;
-                    helix::ui::async_call(
-                        [](void* ctx) {
-                            auto* self = static_cast<WizardWifiStep*>(ctx);
-                            // Double-check cleanup in async callback
-                            if (self->cleanup_called_) {
-                                spdlog::debug("[{}] Cleanup called, skipping network list update",
-                                              self->get_name());
-                                return;
-                            }
-                            self->populate_network_list(self->cached_networks_);
-                        },
-                        this);
-                }
+                cached_networks_ = networks;
+                // Marshal to UI thread — scan callback runs on background thread.
+                // queue_widget_update guards against screen_root_ being destroyed.
+                helix::ui::queue_widget_update(screen_root_, [this](lv_obj_t*) {
+                    if (cleanup_called_) {
+                        spdlog::debug("[{}] Cleanup called, skipping network list update",
+                                      get_name());
+                        return;
+                    }
+                    lv_subject_set_int(&wifi_scanning_, 0);
+                    if (!cached_networks_.empty()) {
+                        populate_network_list(cached_networks_);
+                    }
+                });
             });
         } else {
             spdlog::debug("[{}] WiFi not available or failed to start", get_name());
