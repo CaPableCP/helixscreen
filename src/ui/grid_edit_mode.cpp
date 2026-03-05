@@ -2381,8 +2381,11 @@ void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
         create_dots_overlay();
     }
 
-    // Select the newly added widget so its chrome is visible immediately
+    // Select the newly added widget so its chrome is visible immediately.
+    // Force layout update first — the widget was just created by rebuild_cb_()
+    // so LVGL hasn't calculated its position yet (coordinates would be 0,0).
     if (active_ && container_) {
+        lv_obj_update_layout(container_);
         lv_obj_t* new_widget = lv_obj_find_by_name(container_, widget_id.c_str());
         if (new_widget) {
             select_widget(new_widget);
