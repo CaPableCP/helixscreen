@@ -13,6 +13,7 @@ namespace helix {
 struct BundleOptions {
     bool include_klipper_logs = false;
     bool include_moonraker_logs = false;
+    std::string user_note;
 };
 
 struct BundleResult {

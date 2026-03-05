@@ -36,6 +36,11 @@
           <text_body text="Include Klipper/Moonraker logs" translation_tag="Include Klipper/Moonraker logs"/>
           <ui_switch name="include_logs_switch" bind_checked="debug_bundle_include_logs"/>
         </lv_obj>
+        <!-- Optional user note -->
+        <lv_textarea name="user_note_textarea"
+                     width="100%" height="content" style_min_height="56" style_max_height="100"
+                     placeholder_text="Describe the issue (optional)" one_line="false"
+                     style_pad_all="#space_sm" style_text_font="#font_small"/>
       </lv_obj>
 
       <!-- STATE 1: Uploading -->

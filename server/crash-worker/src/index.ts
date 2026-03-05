@@ -67,6 +67,7 @@ interface BundleMetadata {
   klipper_version: string;
   platform: string;
   timestamp: string;
+  user_note: string;
 }
 
 /** Entry in the bundle listing response. */
@@ -79,7 +80,18 @@ interface BundleListEntry {
     printer_model: string;
     platform: string;
     klipper_version: string;
+    user_note: string;
   };
+}
+
+/** Escape HTML special characters to prevent XSS in email templates. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export default {
@@ -424,6 +436,7 @@ async function handleDebugBundleUpload(request: Request, env: Env): Promise<Resp
       printer_model: metadata.printer_model,
       platform: metadata.platform,
       klipper_version: metadata.klipper_version,
+      user_note: metadata.user_note.slice(0, 100),
       uploaded: new Date().toISOString(),
     },
   });
@@ -534,6 +547,7 @@ async function handleDebugBundleList(request: Request, env: Env, url: URL): Prom
         custom.printer_model || "",
         custom.platform || "",
         custom.klipper_version || "",
+        custom.user_note || "",
         obj.key,
       ]
         .join(" ")
@@ -550,6 +564,7 @@ async function handleDebugBundleList(request: Request, env: Env, url: URL): Prom
         printer_model: custom.printer_model || "",
         platform: custom.platform || "",
         klipper_version: custom.klipper_version || "",
+        user_note: custom.user_note || "",
       },
     });
 
@@ -597,12 +612,14 @@ async function extractBundleMetadata(gzippedBody: ArrayBuffer): Promise<BundleMe
     const json = JSON.parse(text) as Record<string, unknown>;
     const printerInfo = json.printer_info as Record<string, string> | undefined;
     const systemInfo = json.system_info as Record<string, string> | undefined;
+    const rawNote = typeof json.user_note === "string" ? json.user_note : "";
     return {
       version: (json.version as string) || "unknown",
       printer_model: printerInfo?.model || "unknown",
       klipper_version: printerInfo?.klipper_version || "unknown",
       platform: systemInfo?.platform || "unknown",
       timestamp: (json.timestamp as string) || new Date().toISOString(),
+      user_note: rawNote.slice(0, 500),
     };
   } catch {
     return {
@@ -611,6 +628,7 @@ async function extractBundleMetadata(gzippedBody: ArrayBuffer): Promise<BundleMe
       klipper_version: "unknown",
       platform: "unknown",
       timestamp: new Date().toISOString(),
+      user_note: "",
     };
   }
 }
@@ -647,7 +665,8 @@ async function sendBundleNotification(
       <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">Klipper</td><td>${metadata.klipper_version}</td></tr>
       <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">Platform</td><td>${metadata.platform}</td></tr>
       <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">Client IP</td><td>${clientIP}</td></tr>
-      <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">Time</td><td>${metadata.timestamp}</td></tr>
+      <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">Time</td><td>${metadata.timestamp}</td></tr>${metadata.user_note ? `
+      <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">User Note</td><td>${escapeHtml(metadata.user_note)}</td></tr>` : ""}
     </table>
     <p style="margin-top: 16px;">Retrieve with:</p>
     <pre style="background: #f4f4f4; padding: 8px; border-radius: 4px;">curl --compressed -H "X-Admin-Key: \$HELIX_ADMIN_KEY" https://crash.helixscreen.org/v1/debug-bundle/${shareCode}</pre>
@@ -659,7 +678,7 @@ Printer: ${metadata.printer_model}
 Klipper: ${metadata.klipper_version}
 Platform: ${metadata.platform}
 IP: ${clientIP}
-Time: ${metadata.timestamp}
+Time: ${metadata.timestamp}${metadata.user_note ? `\nUser Note: ${metadata.user_note}` : ""}
 
 Retrieve: curl --compressed -H "X-Admin-Key: $HELIX_ADMIN_KEY" https://crash.helixscreen.org/v1/debug-bundle/${shareCode}`;
 

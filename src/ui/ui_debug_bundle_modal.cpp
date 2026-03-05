@@ -3,6 +3,7 @@
 
 #include "ui_debug_bundle_modal.h"
 
+#include "ui_keyboard_manager.h"
 #include "ui_update_queue.h"
 
 #include "lvgl/src/others/translation/lv_translation.h"
@@ -66,6 +67,13 @@ bool DebugBundleModal::show_modal(lv_obj_t* parent) {
 
 void DebugBundleModal::on_show() {
     spdlog::debug("[DebugBundleModal] on_show");
+    if (dialog()) {
+        lv_obj_t* note_ta = lv_obj_find_by_name(dialog(), "user_note_textarea");
+        if (note_ta) {
+            lv_textarea_set_max_length(note_ta, 500);
+            KeyboardManager::instance().register_textarea(note_ta);
+        }
+    }
 }
 
 void DebugBundleModal::on_hide() {
@@ -169,14 +177,24 @@ void DebugBundleModal::on_close_cb(lv_event_t* /*e*/) {
 void DebugBundleModal::handle_upload() {
     spdlog::info("[DebugBundleModal] Upload clicked");
 
-    // Transition to uploading state
-    lv_subject_set_int(&state_subject_, 1);
-    lv_subject_copy_string(&status_subject_, lv_tr("Collecting data..."));
-
-    // Build options from toggle state
+    // Build options from UI state (read textarea before state transition hides it)
     helix::BundleOptions options;
     options.include_klipper_logs = (lv_subject_get_int(&include_logs_subject_) != 0);
     options.include_moonraker_logs = options.include_klipper_logs;
+
+    if (dialog()) {
+        lv_obj_t* note_ta = lv_obj_find_by_name(dialog(), "user_note_textarea");
+        if (note_ta) {
+            const char* text = lv_textarea_get_text(note_ta);
+            if (text && text[0] != '\0') {
+                options.user_note = text;
+            }
+        }
+    }
+
+    // Transition to uploading state
+    lv_subject_set_int(&state_subject_, 1);
+    lv_subject_copy_string(&status_subject_, lv_tr("Collecting data..."));
 
     // Capture alive flag to prevent use-after-free if modal is dismissed during upload
     auto alive = alive_;

@@ -38,6 +38,10 @@ json DebugBundleCollector::collect(const BundleOptions& options) {
 
     bundle["version"] = HELIX_VERSION;
 
+    if (!options.user_note.empty()) {
+        bundle["user_note"] = sanitize_value(options.user_note);
+    }
+
     // ISO 8601 timestamp
     auto now = std::chrono::system_clock::now();
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
@@ -766,7 +770,7 @@ std::string DebugBundleCollector::collect_log_tail_from_paths(const std::vector<
 std::string DebugBundleCollector::collect_syslog_tail(int num_lines) {
     // On embedded Linux (AD5M, AD5X), the app logs via syslog to /var/log/messages.
     // Filter for helix-screen entries only.
-    static const std::vector<std::string> syslog_paths = {
+    const std::vector<std::string> syslog_paths = {
         "/var/log/messages",
         "/var/log/syslog",
     };

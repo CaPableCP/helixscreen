@@ -140,7 +140,12 @@ for b in bundles:
     # Truncate long printer names
     if len(printer) > 16:
         printer = printer[:15] + '…'
-    print(fmt.format(code, size_str, uploaded, version, printer, platform))
+    line = fmt.format(code, size_str, uploaded, version, printer, platform)
+    note = meta.get('user_note', '') or ''
+    if note:
+        note_preview = note[:60] + ('…' if len(note) > 60 else '')
+        line += f'  \U0001f4dd {note_preview}'
+    print(line)
 
 if data.get('truncated'):
     print(f'\\n... more results available (use --limit to increase)')
@@ -206,7 +211,11 @@ plat = s.get('platform', '?')
 ram = s.get('total_ram_mb', '?')
 lang = d.get('settings', {}).get('language', '?')
 uptime_h = round(s.get('uptime_seconds', 0) / 3600, 1)
-print(f'[{code}] {ts} | v{v} | {model} | {plat} {ram}MB | klippy={state} | lang={lang} | uptime={uptime_h}h')
+note = d.get('user_note', '')
+summary = f'[{code}] {ts} | v{v} | {model} | {plat} {ram}MB | klippy={state} | lang={lang} | uptime={uptime_h}h'
+if note:
+    summary += f' | note={note[:80]}'
+print(summary)
 "
         ;;
     --pretty|*)
@@ -226,6 +235,9 @@ uptime_d = round(uptime_h / 24, 1)
 print(f'=== Debug Bundle: $CODE ===')
 print(f'Timestamp:  {ts}')
 print(f'Version:    {v}')
+note = d.get('user_note', '')
+if note:
+    print(f'User Note:  {note}')
 print()
 print(f'--- System ---')
 print(f'Platform:   {s.get(\"platform\", \"?\")}')
