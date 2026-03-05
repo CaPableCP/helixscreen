@@ -104,12 +104,8 @@ class AboutSettingsOverlay : public OverlayBase {
     //
 
     void setup_contributor_marquee();
-    void start_marquee_animation();
-    void stop_marquee_animation();
 
     lv_obj_t* marquee_content_ = nullptr;
-    lv_anim_t marquee_anim_{};
-    bool marquee_running_ = false;
 
     //
     // === Reactive Subjects ===

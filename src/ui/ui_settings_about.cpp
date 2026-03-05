@@ -72,7 +72,6 @@ AboutSettingsOverlay::AboutSettingsOverlay() {
 }
 
 AboutSettingsOverlay::~AboutSettingsOverlay() {
-    stop_marquee_animation();
     spdlog::trace("[{}] Destroyed", get_name());
 }
 
@@ -190,16 +189,10 @@ void AboutSettingsOverlay::on_activate() {
     // Refresh info rows with current data
     populate_info_rows();
     fetch_print_hours();
-
-    // Start marquee animation
-    start_marquee_animation();
 }
 
 void AboutSettingsOverlay::on_deactivate() {
     OverlayBase::on_deactivate();
-
-    // Pause marquee to save CPU
-    stop_marquee_animation();
 }
 
 // ============================================================================
@@ -216,81 +209,25 @@ void AboutSettingsOverlay::setup_contributor_marquee() {
         return;
     }
 
-    // Create an inner container that holds all labels and will be animated
-    marquee_content_ = lv_obj_create(marquee_container);
-    lv_obj_set_size(marquee_content_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_style_pad_all(marquee_content_, 0, 0);
-    lv_obj_set_style_bg_opa(marquee_content_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(marquee_content_, 0, 0);
-    lv_obj_set_flex_flow(marquee_content_, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_flex_cross_place(marquee_content_, LV_FLEX_ALIGN_CENTER, 0);
-    lv_obj_set_style_pad_gap(marquee_content_, 0, 0);
-    lv_obj_remove_flag(marquee_content_, LV_OBJ_FLAG_SCROLLABLE);
-
-    auto create_label_set = [this]() {
-        for (int i = 0; i < kContributorCount; i++) {
-            if (i > 0) {
-                // Bullet separator
-                auto* sep = lv_label_create(marquee_content_);
-                lv_label_set_text(sep, "  \xe2\x80\xa2  ");
-                lv_obj_set_style_text_color(sep, theme_manager_get_color("text_muted"), 0);
-            }
-            auto* label = lv_label_create(marquee_content_);
-            lv_label_set_text(label, kContributors[i]);
-            lv_obj_set_style_text_color(label, theme_manager_get_color("text_subtle"), 0);
+    // Build a single concatenated string: "Name1  •  Name2  •  Name3"
+    std::string text;
+    for (int i = 0; i < kContributorCount; i++) {
+        if (i > 0) {
+            text += "  \xe2\x80\xa2  ";
         }
-    };
+        text += kContributors[i];
+    }
 
-    // Create two copies for seamless looping
-    create_label_set();
-
-    // Add trailing separator before the duplicate set
-    auto* trail_sep = lv_label_create(marquee_content_);
-    lv_label_set_text(trail_sep, "  \xe2\x80\xa2  ");
-    lv_obj_set_style_text_color(trail_sep, theme_manager_get_color("text_muted"), 0);
-
-    create_label_set();
+    // Single label with LVGL's built-in scroll long mode
+    marquee_content_ = lv_label_create(marquee_container);
+    lv_obj_set_width(marquee_content_, lv_pct(100));
+    lv_label_set_long_mode(marquee_content_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_label_set_text(marquee_content_, text.c_str());
+    lv_obj_set_style_text_color(marquee_content_, theme_manager_get_color("text_subtle"), 0);
+    lv_obj_set_style_anim_duration(marquee_content_, text.size() * 100, 0);
 
     spdlog::debug("[{}] Contributor marquee set up with {} contributors", get_name(),
                   kContributorCount);
-}
-
-void AboutSettingsOverlay::start_marquee_animation() {
-    if (marquee_running_ || !marquee_content_)
-        return;
-
-    // Force layout to get accurate content width
-    lv_obj_update_layout(marquee_content_);
-    int32_t content_width = lv_obj_get_width(marquee_content_);
-    // Half width = one full set of names
-    int32_t half_width = content_width / 2;
-
-    if (half_width <= 0)
-        return;
-
-    lv_anim_init(&marquee_anim_);
-    lv_anim_set_var(&marquee_anim_, marquee_content_);
-    lv_anim_set_values(&marquee_anim_, 0, -half_width);
-    // Scroll speed: ~50px/sec for readability
-    int32_t duration_ms = (half_width * 1000) / 50;
-    lv_anim_set_duration(&marquee_anim_, static_cast<uint32_t>(duration_ms));
-    lv_anim_set_repeat_count(&marquee_anim_, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_exec_cb(&marquee_anim_, [](void* obj, int32_t val) {
-        lv_obj_set_style_translate_x(static_cast<lv_obj_t*>(obj), val, 0);
-    });
-    lv_anim_start(&marquee_anim_);
-
-    marquee_running_ = true;
-    spdlog::trace("[{}] Marquee animation started (half_width={})", get_name(), half_width);
-}
-
-void AboutSettingsOverlay::stop_marquee_animation() {
-    if (!marquee_running_ || !marquee_content_)
-        return;
-
-    lv_anim_delete(marquee_content_, nullptr);
-    marquee_running_ = false;
-    spdlog::trace("[{}] Marquee animation stopped", get_name());
 }
 
 // ============================================================================

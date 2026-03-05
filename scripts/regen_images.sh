@@ -101,6 +101,12 @@ IMAGES_TO_RENDER=(
     "assets/images/helixscreen-logo.png:splash-logo:Splash screen logo"
 )
 
+# Fixed-size images (not scaled per screen size)
+# Format: "source_path:output_name:size:description"
+FIXED_IMAGES=(
+    "assets/images/helixscreen-logo.png:about-logo:120:About screen logo"
+)
+
 print_header() {
     echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}║         HelixScreen Image Pre-Rendering System             ║${NC}"
@@ -184,6 +190,26 @@ render_all() {
                 ((failed++)) || true
             fi
         done
+    done
+
+    # Fixed-size images — output to assets/images/ (committed to repo, like gradients)
+    local fixed_output="$LVGL_PROJECT_DIR/assets/images"
+    for image_spec in "${FIXED_IMAGES[@]}"; do
+        IFS=':' read -r source_path output_name target_size description <<< "$image_spec"
+        local full_source="$LVGL_PROJECT_DIR/$source_path"
+        echo -e "\n${CYAN}Rendering: $description${NC}"
+        echo "  Source: $source_path"
+        echo ""
+        echo -ne "    ${target_size}x${target_size}... "
+
+        if lvgl_render_image "$full_source" "$fixed_output" "$output_name" "$target_size"; then
+            local size=$(lvgl_file_size "$fixed_output/${output_name}.bin")
+            echo -e "${GREEN}✓${NC} ($size)"
+            ((success++)) || true
+        else
+            echo -e "${RED}✗ Failed${NC}"
+            ((failed++)) || true
+        fi
     done
 
     echo ""
