@@ -11,6 +11,7 @@
 #include "led/led_controller.h"
 #include "material_settings_manager.h"
 #include "moonraker_client.h"
+#include "printer_detector.h"
 #include "printer_state.h"
 #include "runtime_config.h"
 #include "safety_settings_manager.h"
@@ -25,6 +26,7 @@ using namespace helix;
 
 // Z movement style options (Auto=0, Bed Moves=1, Nozzle Moves=2)
 static const char* Z_MOVEMENT_STYLE_OPTIONS_TEXT = "Auto\nBed Moves\nNozzle Moves";
+static const char* TOOLHEAD_STYLE_OPTIONS_TEXT = "Auto\nDefault\nStealthburner\nArmored Turtle";
 
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;
@@ -72,6 +74,12 @@ void SettingsManager::init_subjects() {
     int extrude_speed = config->get<int>("/filament/extrude_speed", 5);
     extrude_speed = std::clamp(extrude_speed, 1, 50);
     UI_MANAGED_SUBJECT_INT(extrude_speed_subject_, extrude_speed, "settings_extrude_speed",
+                           subjects_);
+
+    // Toolhead style (default: 0 = Auto)
+    int toolhead_style = config->get<int>("/appearance/toolhead_style", 0);
+    toolhead_style = std::clamp(toolhead_style, 0, 3);
+    UI_MANAGED_SUBJECT_INT(toolhead_style_subject_, toolhead_style, "settings_toolhead_style",
                            subjects_);
 
     subjects_initialized_ = true;
@@ -153,6 +161,40 @@ void SettingsManager::set_z_movement_style(ZMovementStyle style) {
 
 const char* SettingsManager::get_z_movement_style_options() {
     return Z_MOVEMENT_STYLE_OPTIONS_TEXT;
+}
+
+// =============================================================================
+// TOOLHEAD STYLE
+// =============================================================================
+
+ToolheadStyle SettingsManager::get_toolhead_style() const {
+    int val = lv_subject_get_int(const_cast<lv_subject_t*>(&toolhead_style_subject_));
+    return static_cast<ToolheadStyle>(std::clamp(val, 0, 3));
+}
+
+ToolheadStyle SettingsManager::get_effective_toolhead_style() const {
+    auto style = get_toolhead_style();
+    if (style != ToolheadStyle::AUTO) {
+        return style;
+    }
+    if (PrinterDetector::is_voron_printer()) {
+        return ToolheadStyle::STEALTHBURNER;
+    }
+    return ToolheadStyle::DEFAULT;
+}
+
+void SettingsManager::set_toolhead_style(ToolheadStyle style) {
+    int val = static_cast<int>(style);
+    val = std::clamp(val, 0, 3);
+    spdlog::info("[SettingsManager] set_toolhead_style({})", val);
+    lv_subject_set_int(&toolhead_style_subject_, val);
+    Config* config = Config::get_instance();
+    config->set<int>("/appearance/toolhead_style", val);
+    config->save();
+}
+
+const char* SettingsManager::get_toolhead_style_options() {
+    return TOOLHEAD_STYLE_OPTIONS_TEXT;
 }
 
 // ============================================================================

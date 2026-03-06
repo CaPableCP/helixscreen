@@ -487,10 +487,9 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
     PathSegment error_seg = backend->infer_error_segment();
     ui_filament_path_canvas_set_error_segment(canvas, static_cast<int>(error_seg));
 
-    // Use Stealthburner toolhead for Voron printers
-    if (PrinterDetector::is_voron_printer()) {
-        ui_filament_path_canvas_set_faceted_toolhead(canvas, true);
-    }
+    // Set toolhead style from user preference (resolves Auto via printer detection)
+    ui_filament_path_canvas_set_toolhead_style(
+        canvas, helix::SettingsManager::instance().get_effective_toolhead_style());
 
     // Set per-slot prep sensor capability flags
     for (int i = 0; i < slot_count; ++i) {

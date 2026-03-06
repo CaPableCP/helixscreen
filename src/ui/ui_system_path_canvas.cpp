@@ -11,12 +11,15 @@
 #include "helix-xml/src/xml/lv_xml_widget.h"
 #include "helix-xml/src/xml/parsers/lv_xml_obj_parser.h"
 #include "lvgl/lvgl.h"
+#include "nozzle_renderer_a4t.h"
 #include "nozzle_renderer_bambu.h"
 #include "nozzle_renderer_faceted.h"
+#include "settings_manager.h"
 #include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <memory>
@@ -106,7 +109,7 @@ struct SystemPathData {
     const lv_font_t* label_font = nullptr;
 
     // Toolhead style
-    bool use_faceted_toolhead = false; // false = Bambu-style, true = Stealthburner/faceted
+    helix::ToolheadStyle toolhead_style = helix::ToolheadStyle::DEFAULT;
 };
 
 // Registry of widget data
@@ -889,10 +892,16 @@ static void system_path_draw_cb(lv_event_t* e) {
             bool is_active_tool = (t == data->active_tool) && data->filament_loaded;
 
             lv_color_t noz_color = is_active_tool ? active_color_lv : nozzle_color;
-            if (data->use_faceted_toolhead) {
-                draw_nozzle_faceted(layer, tool_x, tools_y, noz_color, small_scale);
-            } else {
-                draw_nozzle_bambu(layer, tool_x, tools_y, noz_color, small_scale);
+            switch (data->toolhead_style) {
+                case helix::ToolheadStyle::STEALTHBURNER:
+                    draw_nozzle_faceted(layer, tool_x, tools_y, noz_color, small_scale);
+                    break;
+                case helix::ToolheadStyle::A4T:
+                    draw_nozzle_a4t(layer, tool_x, tools_y, noz_color, small_scale);
+                    break;
+                default:
+                    draw_nozzle_bambu(layer, tool_x, tools_y, noz_color, small_scale);
+                    break;
             }
 
             // Tool badge below nozzle — use pre-formatted label from data
@@ -1064,10 +1073,16 @@ static void system_path_draw_cb(lv_event_t* e) {
                 noz_color = active_color_lv;
             }
 
-            if (data->use_faceted_toolhead) {
-                draw_nozzle_faceted(layer, center_x, nozzle_y, noz_color, data->extruder_scale);
-            } else {
-                draw_nozzle_bambu(layer, center_x, nozzle_y, noz_color, data->extruder_scale);
+            switch (data->toolhead_style) {
+                case helix::ToolheadStyle::STEALTHBURNER:
+                    draw_nozzle_faceted(layer, center_x, nozzle_y, noz_color, data->extruder_scale);
+                    break;
+                case helix::ToolheadStyle::A4T:
+                    draw_nozzle_a4t(layer, center_x, nozzle_y, noz_color, data->extruder_scale);
+                    break;
+                default:
+                    draw_nozzle_bambu(layer, center_x, nozzle_y, noz_color, data->extruder_scale);
+                    break;
             }
 
             // Virtual tool badge beneath nozzle — only when multiple slots feed one toolhead
@@ -1459,10 +1474,14 @@ void ui_system_path_canvas_set_bypass_callback(lv_obj_t* obj, system_path_bypass
     }
 }
 
-void ui_system_path_canvas_set_faceted_toolhead(lv_obj_t* obj, bool faceted) {
+void ui_system_path_canvas_set_toolhead_style_int(lv_obj_t* obj, int style) {
     auto* data = get_data(obj);
-    if (data && data->use_faceted_toolhead != faceted) {
-        data->use_faceted_toolhead = faceted;
+    if (!data)
+        return;
+
+    auto new_style = static_cast<helix::ToolheadStyle>(std::clamp(style, 0, 3));
+    if (data->toolhead_style != new_style) {
+        data->toolhead_style = new_style;
         lv_obj_invalidate(obj);
     }
 }

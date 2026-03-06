@@ -54,7 +54,8 @@ extern "C" {
  *   - error_segment: Error location (0-7, PathSegment enum, 0=none)
  *   - anim_progress: Animation progress 0-100
  *   - filament_color: Active filament color (0xRRGGBB)
- *   - faceted_toolhead: "true" for faceted red style, "false" for Bambu style (default)
+ *   - faceted_toolhead: "true" for Stealthburner style, "false" for Bambu style (default)
+ *     Also accepts "stealthburner", "a4t", or "default" for explicit style selection
  */
 
 /**
@@ -309,14 +310,12 @@ void ui_filament_path_canvas_set_buffer_callback(lv_obj_t* obj, filament_path_bu
 void ui_filament_path_canvas_set_hub_only(lv_obj_t* obj, bool hub_only);
 
 /**
- * @brief Set toolhead renderer style
- *
- * Switches between Bambu-style (metallic gray) and faceted (angular red) toolhead rendering.
+ * @brief Set toolhead renderer style (integer version for C compatibility)
  *
  * @param obj The filament_path_canvas widget
- * @param faceted true for faceted red style, false for Bambu metallic style (default)
+ * @param style 0=DEFAULT, 1=DEFAULT, 2=STEALTHBURNER, 3=A4T
  */
-void ui_filament_path_canvas_set_faceted_toolhead(lv_obj_t* obj, bool faceted);
+void ui_filament_path_canvas_set_toolhead_style_int(lv_obj_t* obj, int style);
 
 /**
  * @brief Set nozzle heat active state
@@ -381,5 +380,17 @@ void ui_filament_path_canvas_set_bypass_color(lv_obj_t* obj, uint32_t color);
 void ui_filament_path_canvas_set_bypass_has_spool(lv_obj_t* obj, bool has_spool);
 
 #ifdef __cplusplus
+}
+
+#include "settings_manager.h"
+
+/**
+ * @brief Set toolhead renderer style (C++ typed version)
+ *
+ * @param obj The filament_path_canvas widget
+ * @param style ToolheadStyle enum value
+ */
+inline void ui_filament_path_canvas_set_toolhead_style(lv_obj_t* obj, helix::ToolheadStyle style) {
+    ui_filament_path_canvas_set_toolhead_style_int(obj, static_cast<int>(style));
 }
 #endif
