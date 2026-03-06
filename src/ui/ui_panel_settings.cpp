@@ -163,6 +163,15 @@ static void on_z_movement_style_changed(lv_event_t* e) {
     SettingsManager::instance().set_z_movement_style(style);
 }
 
+// Static callback for toolhead style dropdown
+static void on_toolhead_style_changed(lv_event_t* e) {
+    lv_obj_t* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
+    auto style = static_cast<ToolheadStyle>(index);
+    spdlog::info("[SettingsPanel] Toolhead style changed: {}", index);
+    SettingsManager::instance().set_toolhead_style(style);
+}
+
 // Static callback for G-code render mode dropdown
 static void on_gcode_mode_changed(lv_event_t* e) {
     lv_obj_t* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
@@ -293,6 +302,7 @@ void SettingsPanel::init_subjects() {
         {"on_bed_mesh_mode_changed", on_bed_mesh_mode_changed},
         {"on_gcode_mode_changed", on_gcode_mode_changed},
         {"on_z_movement_style_changed", on_z_movement_style_changed},
+        {"on_toolhead_style_changed", on_toolhead_style_changed},
         {"on_time_format_changed", on_time_format_changed},
         {"on_language_changed", on_language_changed},
 
@@ -483,6 +493,18 @@ void SettingsPanel::setup_toggle_handlers() {
             auto style = SettingsManager::instance().get_z_movement_style();
             lv_dropdown_set_selected(z_movement_dropdown, static_cast<uint32_t>(style));
             spdlog::trace("[{}]   ✓ Z movement style dropdown (style={})", get_name(),
+                          static_cast<int>(style));
+        }
+    }
+
+    // === Toolhead Style Dropdown ===
+    lv_obj_t* toolhead_style_row = lv_obj_find_by_name(panel_, "row_toolhead_style");
+    if (toolhead_style_row) {
+        lv_obj_t* toolhead_dropdown = lv_obj_find_by_name(toolhead_style_row, "dropdown");
+        if (toolhead_dropdown) {
+            auto style = SettingsManager::instance().get_toolhead_style();
+            lv_dropdown_set_selected(toolhead_dropdown, static_cast<uint32_t>(style));
+            spdlog::trace("[{}]   ✓ Toolhead style dropdown (style={})", get_name(),
                           static_cast<int>(style));
         }
     }
