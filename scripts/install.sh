@@ -1987,13 +1987,8 @@ get_latest_version() {
     local url="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
     log_info "Fetching latest version from GitHub..."
 
-    if command -v curl >/dev/null 2>&1; then
-        # Use basic sed regex (no -E flag) for BusyBox compatibility
-        version=$(curl -sSL --connect-timeout 10 "$url" 2>/dev/null | grep '"tag_name"' | sed 's/.*"\([^"][^"]*\)".*/\1/')
-    elif command -v wget >/dev/null 2>&1; then
-        # Use basic sed regex (no -E flag) for BusyBox compatibility
-        version=$(wget -qO- --timeout=10 "$url" 2>/dev/null | grep '"tag_name"' | sed 's/.*"\([^"][^"]*\)".*/\1/')
-    fi
+    # Use basic sed regex (no -E flag) for BusyBox compatibility
+    version=$(fetch_url "$url" | grep '"tag_name"' | sed 's/.*"\([^"][^"]*\)".*/\1/')
 
     if [ -z "$version" ]; then
         log_error "Failed to fetch latest version."
@@ -2248,38 +2243,27 @@ extract_release() {
     mkdir -p "$extract_dir"
     cd "$extract_dir" || exit 1
 
+    # BusyBox tar doesn't support -z; use gunzip pipe on embedded platforms
+    local extract_ok=false
     if [ "$platform" = "ad5m" ] || [ "$platform" = "ad5x" ] || [ "$platform" = "k1" ]; then
-        # BusyBox tar doesn't support -z
-        if ! gunzip -c "$tarball" | tar xf -; then
-            # Check if it was a space issue vs actual corruption
-            local post_mb
-            post_mb=$(df "$tmp_check_dir" 2>/dev/null | tail -1 | awk '{print int($4/1024)}')
-            if [ -n "$post_mb" ] && [ "$post_mb" -lt 5 ]; then
-                log_error "Failed to extract tarball: no space left on device."
-                log_error "Filesystem $(df "$tmp_check_dir" | tail -1 | awk '{print $1}') is full."
-                log_error "Try: TMP_DIR=/path/with/space sh install.sh ..."
-            else
-                log_error "Failed to extract tarball."
-                log_error "The archive may be corrupted. Try re-downloading."
-            fi
-            rm -rf "$extract_dir"
-            exit 1
-        fi
+        gunzip -c "$tarball" | tar xf - && extract_ok=true
     else
-        if ! tar -xzf "$tarball"; then
-            local post_mb
-            post_mb=$(df "$tmp_check_dir" 2>/dev/null | tail -1 | awk '{print int($4/1024)}')
-            if [ -n "$post_mb" ] && [ "$post_mb" -lt 5 ]; then
-                log_error "Failed to extract tarball: no space left on device."
-                log_error "Filesystem $(df "$tmp_check_dir" | tail -1 | awk '{print $1}') is full."
-                log_error "Try: TMP_DIR=/path/with/space sh install.sh ..."
-            else
-                log_error "Failed to extract tarball."
-                log_error "The archive may be corrupted. Try re-downloading."
-            fi
-            rm -rf "$extract_dir"
-            exit 1
+        tar -xzf "$tarball" && extract_ok=true
+    fi
+
+    if [ "$extract_ok" = false ]; then
+        local post_mb
+        post_mb=$(df "$tmp_check_dir" 2>/dev/null | tail -1 | awk '{print int($4/1024)}')
+        if [ -n "$post_mb" ] && [ "$post_mb" -lt 5 ]; then
+            log_error "Failed to extract tarball: no space left on device."
+            log_error "Filesystem $(df "$tmp_check_dir" | tail -1 | awk '{print $1}') is full."
+            log_error "Try: TMP_DIR=/path/with/space sh install.sh ..."
+        else
+            log_error "Failed to extract tarball."
+            log_error "The archive may be corrupted. Try re-downloading."
         fi
+        rm -rf "$extract_dir"
+        exit 1
     fi
 
     # Phase 2: Validate extracted content
@@ -2458,6 +2442,13 @@ cleanup_old_install() {
 
 #
 # SERVICE_NAME is defined in common.sh
+# Portable in-place sed: GNU sed uses -i, BSD/macOS sed requires -i ''
+_sed_inplace() {
+    local pattern=$1 file=$2
+    $SUDO sed -i "$pattern" "$file" 2>/dev/null || \
+    $SUDO sed -i '' "$pattern" "$file" 2>/dev/null || true
+}
+
 # Returns true if this process is running under the NoNewPrivileges systemd constraint.
 # When helix-screen self-updates, it spawns install.sh as a child process.  The
 # helixscreen.service unit has NoNewPrivileges=true, so ALL sudo calls in install.sh
@@ -2524,14 +2515,9 @@ install_service_systemd() {
     local helix_group="${KLIPPER_USER:-root}"
     local install_dir="${INSTALL_DIR:-/opt/helixscreen}"
 
-    $SUDO sed -i "s|@@HELIX_USER@@|${helix_user}|g" "$service_dest" 2>/dev/null || \
-    $SUDO sed -i '' "s|@@HELIX_USER@@|${helix_user}|g" "$service_dest" 2>/dev/null || true
-
-    $SUDO sed -i "s|@@HELIX_GROUP@@|${helix_group}|g" "$service_dest" 2>/dev/null || \
-    $SUDO sed -i '' "s|@@HELIX_GROUP@@|${helix_group}|g" "$service_dest" 2>/dev/null || true
-
-    $SUDO sed -i "s|@@INSTALL_DIR@@|${install_dir}|g" "$service_dest" 2>/dev/null || \
-    $SUDO sed -i '' "s|@@INSTALL_DIR@@|${install_dir}|g" "$service_dest" 2>/dev/null || true
+    _sed_inplace "s|@@HELIX_USER@@|${helix_user}|g" "$service_dest"
+    _sed_inplace "s|@@HELIX_GROUP@@|${helix_group}|g" "$service_dest"
+    _sed_inplace "s|@@INSTALL_DIR@@|${install_dir}|g" "$service_dest"
 
     if ! $SUDO systemctl daemon-reload; then
         log_error "Failed to reload systemd daemon."
@@ -2564,8 +2550,7 @@ install_update_watcher_systemd() {
     $SUDO cp "$svc_src" "$svc_dest"
 
     # Template the install directory path
-    $SUDO sed -i "s|@@INSTALL_DIR@@|${install_dir}|g" "$path_dest" 2>/dev/null || \
-    $SUDO sed -i '' "s|@@INSTALL_DIR@@|${install_dir}|g" "$path_dest" 2>/dev/null || true
+    _sed_inplace "s|@@INSTALL_DIR@@|${install_dir}|g" "$path_dest"
 
     $SUDO systemctl daemon-reload
     $SUDO systemctl enable helixscreen-update.path 2>/dev/null || true
@@ -2600,8 +2585,7 @@ install_service_sysv() {
 
     # Update the DAEMON_DIR in the init script to match the install location
     # This is important for Klipper Mod which uses a different path
-    $SUDO sed -i "s|DAEMON_DIR=.*|DAEMON_DIR=\"${INSTALL_DIR}\"|" "$INIT_SCRIPT_DEST" 2>/dev/null || \
-    $SUDO sed -i '' "s|DAEMON_DIR=.*|DAEMON_DIR=\"${INSTALL_DIR}\"|" "$INIT_SCRIPT_DEST" 2>/dev/null || true
+    _sed_inplace "s|DAEMON_DIR=.*|DAEMON_DIR=\"${INSTALL_DIR}\"|" "$INIT_SCRIPT_DEST"
 
     CLEANUP_SERVICE=true
     log_success "Installed SysV init script at $INIT_SCRIPT_DEST"

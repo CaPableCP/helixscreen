@@ -17,6 +17,7 @@
 #include "ui_panel_history_dashboard.h"
 #include "ui_panel_memory_stats.h"
 #include "ui_panel_power.h"
+#include "ui_printer_list_overlay.h"
 #include "ui_settings_about.h"
 #include "ui_settings_display.h"
 #include "ui_settings_hardware_health.h"
@@ -321,6 +322,7 @@ void SettingsPanel::init_subjects() {
 
         // Action rows
         {"on_display_settings_clicked", on_display_settings_clicked},
+        {"on_printers_clicked", on_printers_clicked},
         // Note: on_printer_image_clicked moved to PrinterManagerOverlay
         {"on_filament_sensors_clicked", on_filament_sensors_clicked},
     });
@@ -782,6 +784,13 @@ void SettingsPanel::handle_led_settings_clicked() {
     overlay.show(parent_screen_);
 }
 
+void SettingsPanel::handle_printers_clicked() {
+    spdlog::debug("[{}] Printers clicked - opening Printer List", get_name());
+
+    auto& overlay = helix::ui::get_printer_list_overlay();
+    overlay.show(parent_screen_);
+}
+
 void SettingsPanel::handle_display_settings_clicked() {
     spdlog::debug("[{}] Display Settings clicked - delegating to DisplaySettingsOverlay",
                   get_name());
@@ -1158,6 +1167,12 @@ void SettingsPanel::on_led_settings_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void SettingsPanel::on_printers_clicked(lv_event_t* /*e*/) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_printers_clicked");
+    get_global_settings_panel().handle_printers_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
 void SettingsPanel::on_display_settings_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_display_settings_clicked");
     get_global_settings_panel().handle_display_settings_clicked();
@@ -1326,6 +1341,7 @@ void register_settings_panel_callbacks() {
         {"on_telemetry_view_data", SettingsPanel::on_telemetry_view_data},
 
         // Action row callbacks used in settings_panel.xml
+        {"on_printers_clicked", SettingsPanel::on_printers_clicked},
         {"on_display_settings_clicked", SettingsPanel::on_display_settings_clicked},
         {"on_filament_sensors_clicked", SettingsPanel::on_filament_sensors_clicked},
         {"on_macro_buttons_clicked", SettingsPanel::on_macro_buttons_clicked},
