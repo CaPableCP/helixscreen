@@ -240,8 +240,10 @@ else ifeq ($(PLATFORM_TARGET),ad5x)
     # -Wno-error=conversion: LVGL headers have int32_t->float conversions that GCC flags
     # -DHELIX_RELEASE_BUILD: Disables debug features like LV_USE_ASSERT_STYLE
     # NOTE: ad5x framebuffer is 32bpp (ARGB8888), as is lv_conf.h (LV_COLOR_DEPTH=32)
+    # -funwind-tables: Emit DWARF unwind info so backtrace() can walk the full
+    # call stack in crash reports. Small code size cost, zero runtime cost.
     TARGET_CFLAGS := -march=mips32r5 -mtune=mips32r5 -mabi=32 -mnan=2008 -mfp64 \
-        -Os -flto -ffunction-sections -fdata-sections \
+        -Os -flto -ffunction-sections -fdata-sections -funwind-tables \
         -Wno-error=conversion -Wno-error=sign-conversion -DHELIX_RELEASE_BUILD -DHELIX_PLATFORM_AD5X
     # -Wl,--gc-sections: Remove unused sections during linking (works with -ffunction-sections)
     # -flto: Must match compiler flag for LTO to work
@@ -276,8 +278,10 @@ else ifeq ($(PLATFORM_TARGET),cc1)
     # -Wno-error=conversion: LVGL headers have int32_t->float conversions that GCC flags
     # -DHELIX_RELEASE_BUILD: Disables debug features like LV_USE_ASSERT_STYLE
     # NOTE: CC1 framebuffer is 32bpp (ARGB8888), as is lv_conf.h (LV_COLOR_DEPTH=32)
+    # -funwind-tables: Emit ARM unwind info (.ARM.exidx) so backtrace() can walk
+    # the full call stack in crash reports. ~5-10% code size, zero runtime cost.
     TARGET_CFLAGS := -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -mtune=cortex-a7 \
-        -Os -flto -ffunction-sections -fdata-sections \
+        -Os -flto -ffunction-sections -fdata-sections -funwind-tables \
         -Wno-error=conversion -Wno-error=sign-conversion -DHELIX_RELEASE_BUILD -DHELIX_PLATFORM_CC1
     # -Wl,--gc-sections: Remove unused sections during linking (works with -ffunction-sections)
     # -flto: Must match compiler flag for LTO to work
@@ -366,8 +370,10 @@ else ifeq ($(PLATFORM_TARGET),k1-dynamic)
     # NaN2008 + FP64 flags are critical for ABI compatibility with K1 firmware
     # No LTO: GCC 7.5 static toolchain doesn't ship liblto_plugin.so
     # -isystem include/compat: Filesystem shim — GCC 7 only has <experimental/filesystem>
+    # -funwind-tables: Emit DWARF unwind info so backtrace() can walk the full
+    # call stack in crash reports. Small code size cost, zero runtime cost.
     TARGET_CFLAGS := -march=mips32r2 -mtune=mips32r2 -mnan=2008 -mfp64 \
-        -Os -ffunction-sections -fdata-sections \
+        -Os -ffunction-sections -fdata-sections -funwind-tables \
         -fomit-frame-pointer \
         -isystem include/compat \
         -Wno-error=conversion -Wno-error=sign-conversion \
@@ -427,7 +433,9 @@ else ifeq ($(PLATFORM_TARGET),snapmaker-u1)
     CROSS_COMPILE ?= aarch64-linux-gnu-
     TARGET_ARCH := aarch64
     TARGET_TRIPLE := aarch64-linux-gnu
-    TARGET_CFLAGS := -march=armv8-a -Os -flto -ffunction-sections -fdata-sections \
+    # -funwind-tables: Emit ARM unwind info so backtrace() can walk the full
+    # call stack in crash reports. Small code size cost, zero runtime cost.
+    TARGET_CFLAGS := -march=armv8-a -funwind-tables -Os -flto -ffunction-sections -fdata-sections \
         -Wno-error=conversion -Wno-error=sign-conversion -DHELIX_RELEASE_BUILD -DHELIX_PLATFORM_SNAPMAKER_U1
     TARGET_LDFLAGS := -Wl,--gc-sections -flto -static
     ENABLE_SSL := yes

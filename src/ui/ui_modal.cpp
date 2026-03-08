@@ -79,6 +79,21 @@ static void clear_user_data_recursive(lv_obj_t* obj) {
     }
 }
 
+// Recursively remove LV_OBJ_FLAG_CLICKABLE from an object tree to prevent
+// LVGL from delivering queued/delayed touch events during exit animation.
+// Belt-and-suspenders defense alongside clear_user_data_recursive: even if a
+// nested XML component button retains non-null user_data, its click callback
+// won't fire because LVGL skips non-clickable objects in indev processing.
+static void disable_clicks_recursive(lv_obj_t* obj) {
+    if (!obj)
+        return;
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+    uint32_t child_count = lv_obj_get_child_count(obj);
+    for (uint32_t i = 0; i < child_count; i++) {
+        disable_clicks_recursive(lv_obj_get_child(obj, i));
+    }
+}
+
 // ============================================================================
 // MODALSTACK IMPLEMENTATION
 // ============================================================================
@@ -330,6 +345,7 @@ Modal::~Modal() {
             // Clear user_data on all wired buttons to prevent stale dispatch
             // after destruction — matches what hide() does for animated exits
             clear_user_data_recursive(dialog_);
+            disable_clicks_recursive(dialog_);
         }
 
         // Remove event callbacks that hold `this` as user_data to prevent
@@ -590,6 +606,11 @@ void Modal::hide() {
     // async_call(delete this) in on_hide())
     if (dialog_) {
         clear_user_data_recursive(dialog_);
+        // Also disable clickability on entire dialog tree so LVGL won't
+        // deliver queued/delayed touch events during exit animation.
+        // Defends against nested XML component buttons that
+        // clear_user_data_recursive may not reach.
+        disable_clicks_recursive(dialog_);
     }
 
     // Remove event callbacks from backdrop to prevent stale Modal* dispatch.

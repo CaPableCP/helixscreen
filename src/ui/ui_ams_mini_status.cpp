@@ -374,9 +374,7 @@ static void rebuild_bars(AmsMiniStatusData* data) {
     // Update overflow label
     if (data->overflow_label) {
         if (overflow_count > 0) {
-            char buf[16];
-            snprintf(buf, sizeof(buf), "+%d", overflow_count);
-            lv_label_set_text(data->overflow_label, buf);
+            lv_label_set_text_fmt(data->overflow_label, "+%d", overflow_count);
             lv_obj_remove_flag(data->overflow_label, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_add_flag(data->overflow_label, LV_OBJ_FLAG_HIDDEN);
