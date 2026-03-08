@@ -79,6 +79,25 @@ void SpoolmanListView::cleanup() {
     spdlog::debug("[SpoolmanListView] cleanup()");
 }
 
+void SpoolmanListView::reset() {
+    for (auto* row : pool_) {
+        lv_obj_add_flag(row, LV_OBJ_FLAG_HIDDEN);
+    }
+    std::fill(pool_indices_.begin(), pool_indices_.end(), static_cast<ssize_t>(-1));
+    if (leading_spacer_) {
+        lv_obj_set_height(leading_spacer_, 0);
+    }
+    if (trailing_spacer_) {
+        lv_obj_set_height(trailing_spacer_, 0);
+    }
+    visible_start_ = -1;
+    visible_end_ = -1;
+    total_items_ = 0;
+    last_leading_height_ = -1;
+    last_trailing_height_ = -1;
+    spdlog::debug("[SpoolmanListView] reset()");
+}
+
 // ============================================================================
 // Pool Initialization
 // ============================================================================
@@ -212,12 +231,14 @@ void SpoolmanListView::configure_row(lv_obj_t* row, const SpoolInfo& spool, int 
 // Population / Visibility
 // ============================================================================
 
-void SpoolmanListView::populate(const std::vector<SpoolInfo>& spools, int active_spool_id) {
+void SpoolmanListView::populate(const std::vector<SpoolInfo>& spools, int active_spool_id,
+                                bool preserve_scroll) {
     if (!container_) {
         return;
     }
 
-    spdlog::debug("[SpoolmanListView] Populating with {} spools", spools.size());
+    spdlog::debug("[SpoolmanListView] Populating with {} spools (preserve_scroll={})", spools.size(),
+                  preserve_scroll);
 
     // Initialize pool on first call
     if (pool_.empty()) {
@@ -240,7 +261,7 @@ void SpoolmanListView::populate(const std::vector<SpoolInfo>& spools, int active
                       cached_row_height_, cached_row_gap_);
     }
 
-    // Reset visible range, spacer caches, and scroll
+    // Reset visible range, spacer caches
     visible_start_ = -1;
     visible_end_ = -1;
     last_leading_height_ = -1;
@@ -249,7 +270,9 @@ void SpoolmanListView::populate(const std::vector<SpoolInfo>& spools, int active
     // Invalidate pool indices to force reconfiguration on data change
     std::fill(pool_indices_.begin(), pool_indices_.end(), static_cast<ssize_t>(-1));
 
-    lv_obj_scroll_to_y(container_, 0, LV_ANIM_OFF);
+    if (!preserve_scroll) {
+        lv_obj_scroll_to_y(container_, 0, LV_ANIM_OFF);
+    }
 
     // Update visible rows
     update_visible(spools, active_spool_id);
@@ -301,7 +324,7 @@ void SpoolmanListView::update_visible(const std::vector<SpoolInfo>& spools, int 
 
     total_items_ = total_rows;
 
-    spdlog::trace(
+    spdlog::debug(
         "[SpoolmanListView] Rendering rows {}-{} of {} (scroll_y={} viewport={} data_changed={})",
         first_visible, last_visible, total_rows, scroll_y, viewport_height, data_changed);
 
@@ -348,6 +371,19 @@ void SpoolmanListView::update_visible(const std::vector<SpoolInfo>& spools, int 
         lv_obj_add_flag(pool_[pool_idx], LV_OBJ_FLAG_HIDDEN);
         pool_indices_[pool_idx] = -1;
     }
+
+    // Ensure trailing spacer is always last child
+    if (trailing_spacer_) {
+        int32_t child_count = lv_obj_get_child_count(container_);
+        if (lv_obj_get_index(trailing_spacer_) != child_count - 1) {
+            lv_obj_move_to_index(trailing_spacer_, child_count - 1);
+        }
+    }
+
+    spdlog::debug("[SpoolmanListView] Spacers: leading={}px trailing={}px, visible rows={}, "
+                  "container content_h={} child_count={}",
+                  leading_height, trailing_height, last_visible - first_visible,
+                  lv_obj_get_content_height(container_), lv_obj_get_child_count(container_));
 
     visible_start_ = first_visible;
     visible_end_ = last_visible;

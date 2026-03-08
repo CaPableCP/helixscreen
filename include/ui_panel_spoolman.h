@@ -95,6 +95,7 @@ class SpoolmanPanel : public OverlayBase {
 
     // ========== Virtualized List View ==========
     helix::ui::SpoolmanListView list_view_;
+    bool preserve_scroll_ = false; ///< Preserve scroll position on next populate
 
     // ========== Subjects ==========
     SubjectManager subjects_;          ///< RAII subject manager

@@ -13,7 +13,8 @@
 
     <!-- ==================== CONTENT AREA ==================== -->
     <lv_obj name="overlay_content"
-            width="100%" flex_grow="1" style_pad_all="#space_lg" style_pad_gap="#space_md" scrollable="false"
+            width="100%" flex_grow="1" style_pad_left="#space_lg" style_pad_right="#space_lg"
+            style_pad_top="0" style_pad_bottom="#space_sm" style_pad_gap="#space_md" scrollable="false"
             flex_flow="column">
 
       <!-- ==================== STEP 0: SELECT VENDOR ==================== -->
@@ -60,7 +61,7 @@
 
       <!-- ==================== STEP 1: SELECT FILAMENT ==================== -->
       <lv_obj name="step_filament"
-              width="100%" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+              width="100%" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_sm"
               scrollable="false" hidden="true">
         <bind_flag_if_not_eq subject="spool_wizard_step" flag="hidden" ref_value="1"/>
 
@@ -177,10 +178,10 @@
     <!-- ==================== FOOTER: NAVIGATION BUTTONS ==================== -->
     <lv_obj name="wizard_footer"
             width="100%" height="content" flex_flow="row" style_flex_main_place="space_between"
-            style_flex_cross_place="center" style_pad_hor="#space_lg" style_pad_ver="#space_md" scrollable="false">
+            style_flex_cross_place="center" style_pad_hor="#space_lg" style_pad_top="#space_xs" style_pad_bottom="#space_md" scrollable="false">
 
       <!-- Back button: hidden on step 0 -->
-      <ui_button name="back_btn" variant="ghost" text="Back" translation_tag="Back" hidden="true">
+      <ui_button name="back_btn" variant="secondary" text="Back" translation_tag="Back" hidden="true">
         <bind_flag_if_eq subject="spool_wizard_step" flag="hidden" ref_value="0"/>
         <event_cb trigger="clicked" callback="on_wizard_back"/>
       </ui_button>

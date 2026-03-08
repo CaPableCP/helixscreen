@@ -141,12 +141,6 @@ lv_obj_t* SpoolmanPanel::create(lv_obj_t* parent) {
             lv_label_bind_text(title, &header_title_subject_, nullptr);
         }
 
-        // Gate "+" (add spool) button behind beta features
-        lv_obj_t* add_btn = lv_obj_find_by_name(header, "action_button_2");
-        lv_subject_t* beta_subject = lv_xml_get_subject(nullptr, "show_beta_features");
-        if (add_btn && beta_subject) {
-            lv_obj_bind_flag_if_eq(add_btn, beta_subject, LV_OBJ_FLAG_HIDDEN, 0);
-        }
     }
 
     spdlog::info("[{}] Overlay created successfully", get_name());
@@ -192,8 +186,8 @@ void SpoolmanPanel::on_deactivate() {
         search_debounce_timer_ = nullptr;
     }
 
-    // Clean up list view (pool widgets are children of spool_list_, cleaned by LVGL)
-    list_view_.cleanup();
+    // Reset visible state but keep pool intact for reactivation
+    list_view_.reset();
 
     spdlog::debug("[{}] on_deactivate()", get_name());
 
@@ -334,7 +328,8 @@ void SpoolmanPanel::populate_spool_list() {
     }
 
     // Delegate to virtualized list view
-    list_view_.populate(filtered_spools_, active_spool_id_);
+    list_view_.populate(filtered_spools_, active_spool_id_, preserve_scroll_);
+    preserve_scroll_ = false; // Reset after use
     show_spool_list();
 
     spdlog::debug("[{}] Populated {} spool rows (filtered from {})", get_name(),
@@ -460,7 +455,7 @@ void SpoolmanPanel::show_edit_modal(int spool_id) {
 
     edit_modal_.set_completion_callback([this](bool saved) {
         if (saved) {
-            // Refresh the spool list to show updated values
+            preserve_scroll_ = true;
             refresh_spools();
         }
     });
@@ -514,7 +509,9 @@ void SpoolmanPanel::delete_spool(int spool_id) {
                     helix::ui::queue_update([id]() {
                         ToastManager::instance().show(ToastSeverity::SUCCESS,
                                                       lv_tr("Spool deleted"), 2000);
-                        get_global_spoolman_panel().refresh_spools();
+                        auto& panel = get_global_spoolman_panel();
+                        panel.preserve_scroll_ = true;
+                        panel.refresh_spools();
                     });
                 },
                 [id](const MoonrakerError& err) {

@@ -28,7 +28,8 @@
     </lv_obj>
     <!-- Content Area -->
     <lv_obj name="overlay_content"
-            width="100%" flex_grow="1" style_pad_all="#space_lg" style_pad_gap="#space_md" scrollable="false"
+            width="100%" flex_grow="1" style_pad_left="#space_lg" style_pad_right="#space_lg"
+            style_pad_top="0" style_pad_bottom="#space_lg" style_pad_gap="#space_md" scrollable="false"
             flex_flow="column">
       <!-- Disable content when printer not connected or klippy not ready -->
       <bind_state_if_not_eq subject="nav_buttons_enabled" state="disabled" ref_value="1"/>

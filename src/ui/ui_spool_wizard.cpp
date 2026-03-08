@@ -1426,16 +1426,14 @@ void SpoolWizardOverlay::populate_filament_list() {
             lv_obj_set_style_bg_color(swatch, lv_color_hex(color_val), 0);
         }
 
-        // Set material label
+        // Set combined material - name label
         lv_obj_t* material_label = lv_obj_find_by_name(row, "filament_material");
         if (material_label) {
-            lv_label_set_text(material_label, fil.material.c_str());
-        }
-
-        // Set name label
-        lv_obj_t* name_label = lv_obj_find_by_name(row, "filament_name");
-        if (name_label) {
-            lv_label_set_text(name_label, fil.name.c_str());
+            std::string display = fil.material;
+            if (!fil.name.empty()) {
+                display += " - " + fil.name;
+            }
+            lv_label_set_text(material_label, display.c_str());
         }
 
         // Set temps label

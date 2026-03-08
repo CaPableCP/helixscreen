@@ -53,6 +53,14 @@ class SpoolmanListView {
      */
     void cleanup();
 
+    /**
+     * @brief Reset visible state without destroying pool/container
+     *
+     * Used during deactivation to hide rows while keeping the pool intact
+     * so reactivation can repopulate without recreating widgets.
+     */
+    void reset();
+
     // === Population ===
 
     /**
@@ -60,7 +68,8 @@ class SpoolmanListView {
      * @param spools Spool data to display
      * @param active_spool_id Currently active spool ID (-1 for none)
      */
-    void populate(const std::vector<SpoolInfo>& spools, int active_spool_id);
+    void populate(const std::vector<SpoolInfo>& spools, int active_spool_id,
+                  bool preserve_scroll = false);
 
     /**
      * @brief Update visible rows based on scroll position
