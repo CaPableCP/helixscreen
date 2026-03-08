@@ -82,15 +82,18 @@ MoonrakerClient::MoonrakerClient(EventLoopPtr loop)
 }
 
 MoonrakerClient::~MoonrakerClient() {
-    // CRITICAL: Reset lifetime guard FIRST, before any other destruction.
-    // This invalidates all weak_ptr captures in callbacks, causing them to
-    // return early when they try to lock() the weak_ptr. This prevents
-    // use-after-free when callbacks execute on the event loop thread after
-    // we've started destruction.
-    lifetime_guard_.reset();
+    // Set destroying flag FIRST so callbacks see it immediately
+    is_destroying_.store(true, std::memory_order_release);
 
-    // Set destroying flag - backup check for any code paths that don't use the guard
-    is_destroying_.store(true);
+    // Wait for any in-flight callbacks to finish. Callbacks hold a shared lock;
+    // acquiring an exclusive lock here blocks until all shared locks are released.
+    // Once acquired, no new callback can start (try_to_lock will fail).
+    {
+        std::unique_lock<std::shared_mutex> lk(callback_lifecycle_mutex_);
+    } // Release immediately — just needed to wait for in-flight callbacks
+
+    // Now safe to reset lifetime guard (no callbacks can be mid-execution)
+    lifetime_guard_.reset();
 
     // Disable auto-reconnect BEFORE closing - prevents libhv from attempting
     // reconnection after we've started destruction (avoids stderr "No route to host")
@@ -278,16 +281,17 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
     // Capture weak_ptr to lifetime_guard_ to safely detect destruction from event loop thread
     onopen = [this, weak_guard = std::weak_ptr<bool>(lifetime_guard_), on_connected, url]() {
         try {
-            // Check lifetime guard FIRST - if lock fails, destructor has started
-            // This is thread-safe: weak_ptr::lock() is atomic with shared_ptr::reset()
+            // Acquire shared lock to prevent destructor from proceeding while we execute.
+            // try_to_lock ensures we never block if destructor holds the exclusive lock.
+            std::shared_lock<std::shared_mutex> lk(callback_lifecycle_mutex_, std::try_to_lock);
+            if (!lk.owns_lock() || is_destroying_.load(std::memory_order_acquire)) {
+                return; // Destructor is running or waiting, abort callback
+            }
+
+            // Check lifetime guard (defense-in-depth)
             auto guard = weak_guard.lock();
             if (!guard) {
                 return; // Client is being destroyed, abort callback
-            }
-
-            // Backup check (may be redundant but keeps existing logging paths)
-            if (is_destroying_.load()) {
-                return;
             }
 
             // Note: getHttpResponse() available here if needed for upgrade response inspection
@@ -332,16 +336,17 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
         spdlog::trace("[Moonraker Client] onmessage received {} bytes", msg.size());
 
         try {
-            // Check lifetime guard FIRST - if lock fails, destructor has started
-            // This is thread-safe: weak_ptr::lock() is atomic with shared_ptr::reset()
+            // Acquire shared lock to prevent destructor from proceeding while we execute.
+            // try_to_lock ensures we never block if destructor holds the exclusive lock.
+            std::shared_lock<std::shared_mutex> lk(callback_lifecycle_mutex_, std::try_to_lock);
+            if (!lk.owns_lock() || is_destroying_.load(std::memory_order_acquire)) {
+                return; // Destructor is running or waiting, abort callback
+            }
+
+            // Check lifetime guard (defense-in-depth)
             auto guard = weak_guard.lock();
             if (!guard) {
                 return; // Client is being destroyed, abort callback
-            }
-
-            // Backup check (may be redundant but keeps existing logging paths)
-            if (is_destroying_.load()) {
-                return;
             }
 
             // Validate message size to prevent memory exhaustion
@@ -508,20 +513,21 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
         try {
             spdlog::debug("[Moonraker Client] onclose callback invoked");
 
-            // Check lifetime guard FIRST - if lock fails, destructor has started
-            // This is thread-safe: weak_ptr::lock() is atomic with shared_ptr::reset()
+            // Acquire shared lock to prevent destructor from proceeding while we execute.
+            // try_to_lock ensures we never block if destructor holds the exclusive lock.
+            std::shared_lock<std::shared_mutex> lk(callback_lifecycle_mutex_, std::try_to_lock);
+            if (!lk.owns_lock() || is_destroying_.load(std::memory_order_acquire)) {
+                spdlog::debug(
+                    "[Moonraker Client] onclose callback early return due to destruction");
+                return; // Destructor is running or waiting, abort callback
+            }
+
+            // Check lifetime guard (defense-in-depth)
             auto guard = weak_guard.lock();
             if (!guard) {
                 spdlog::debug(
                     "[Moonraker Client] onclose callback early return - client destroyed");
                 return; // Client is being destroyed, abort callback
-            }
-
-            // Backup check (may be redundant but keeps existing logging paths)
-            if (is_destroying_.load()) {
-                spdlog::debug(
-                    "[Moonraker Client] onclose callback early return due to destruction");
-                return;
             }
 
             ConnectionState current = connection_state_.load();

@@ -185,11 +185,11 @@ TEST_CASE("MoonrakerClient destructor clears callbacks (UAF prevention)",
 // ============================================================================
 
 // NOTE: This test requires an actual WebSocket connection to test timeout behavior.
-// Without a connection, send_jsonrpc immediately fails with CONNECTION_ERROR
+// Without a connection, send_jsonrpc immediately fails with CONNECTION_LOST
 // before any timeout can occur. Marked as integration test.
 TEST_CASE_METHOD(MoonrakerClientSecurityFixture,
                  "MoonrakerClient timeout callbacks invoked outside mutex",
-                 "[connection][security][deadlock][issue6][.integration][eventloop][slow]") {
+                 "[connection][security][deadlock][issue6][.integration][slow]") {
     SECTION("Timeout callback can safely call send_jsonrpc (no deadlock)") {
         // This test verifies the two-phase timeout pattern:
         // Phase 1: Copy callbacks under lock
@@ -470,6 +470,76 @@ TEST_CASE("MoonrakerClient all callback types exception-safe (comprehensive)",
 
         // Cleanup with pending requests (triggers error callbacks)
         REQUIRE_NOTHROW(client.reset());
+    }
+}
+
+// ============================================================================
+// Issue #357: Callback Lifecycle Mutex - Destructor/Callback Synchronization
+// ============================================================================
+
+TEST_CASE("MoonrakerClient destructor waits for in-flight callbacks (issue #357)",
+          "[connection][security][uaf][issue357][eventloop][slow]") {
+    SECTION("Rapid create/connect/destroy stress test with callback contention") {
+        // Stress test: rapidly create clients, start connections, and destroy them.
+        // The callback_lifecycle_mutex_ ensures the destructor waits for any
+        // in-flight callbacks before proceeding with member destruction.
+        for (int i = 0; i < 50; i++) {
+            auto loop = std::make_shared<hv::EventLoop>();
+            auto client = std::make_unique<MoonrakerClient>(loop);
+
+            std::atomic<int> callback_count{0};
+
+            // Register various callbacks that touch client state
+            client->register_notify_update([&callback_count](const json&) { callback_count++; });
+
+            client->register_method_callback("test_method", "handler",
+                                             [&callback_count](const json&) { callback_count++; });
+
+            // Start connection (will trigger onclose when destroyed)
+            client->connect(
+                "ws://127.0.0.1:19999/websocket",
+                [&callback_count]() { callback_count++; },
+                [&callback_count]() { callback_count++; });
+
+            // Send pending requests
+            client->send_jsonrpc("printer.info", json(), [](json) {},
+                                 [](const MoonrakerError&) {});
+
+            // Destroy immediately — destructor must set is_destroying_ FIRST,
+            // then acquire exclusive lock to wait for any in-flight callbacks
+            REQUIRE_NOTHROW(client.reset());
+        }
+        // Reaching here without SIGSEGV = mutex synchronization works
+        REQUIRE(true);
+    }
+
+    SECTION("is_destroying flag prevents new callback execution during destruction") {
+        auto loop = std::make_shared<hv::EventLoop>();
+        auto client = std::make_unique<MoonrakerClient>(loop);
+
+        std::atomic<bool> state_cb_called{false};
+
+        // Set state change callback — connect() triggers CONNECTING state change,
+        // and destroy triggers state clearing
+        client->set_state_change_callback(
+            [&state_cb_called](ConnectionState old_s, ConnectionState new_s) {
+                state_cb_called = true;
+            });
+
+        client->connect("ws://127.0.0.1:19999/websocket", []() {}, []() {});
+
+        // state_cb should have been called for CONNECTING transition
+        REQUIRE(state_cb_called);
+
+        // Reset tracking
+        state_cb_called = false;
+
+        // Destroy — is_destroying_ should prevent state change callback during teardown
+        client.reset();
+
+        // State callback should NOT be called during destruction
+        // (destructor clears it, and is_destroying_ blocks invocation)
+        REQUIRE_FALSE(state_cb_called);
     }
 }
 

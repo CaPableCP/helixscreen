@@ -54,6 +54,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 
@@ -650,6 +651,11 @@ class MoonrakerClient : public hv::WebSocketClient {
     // Disconnect modal suppression (for intentional restarts)
     std::chrono::steady_clock::time_point suppress_disconnect_modal_until_{};
     mutable std::mutex suppress_mutex_;
+
+    // Callback synchronization mutex
+    // Callbacks take a shared (read) lock; the destructor takes an exclusive (write) lock.
+    // This ensures all in-flight callbacks complete before destruction proceeds.
+    mutable std::shared_mutex callback_lifecycle_mutex_;
 
     // Lifetime guard for safe callback execution
     // Callbacks capture a weak_ptr to this sentinel. When the destructor runs,
