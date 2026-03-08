@@ -1174,6 +1174,10 @@ void WledBackend::fetch_presets_from_device(const std::string& strip_id,
 // ============================================================================
 
 void MacroBackend::add_macro(const LedMacroInfo& macro) {
+    if (macro.display_name.empty()) {
+        spdlog::warn("[MacroBackend] Rejecting macro with empty display name");
+        return;
+    }
     macros_.push_back(macro);
 }
 
@@ -1775,6 +1779,10 @@ void LedController::toggle_all(bool on) {
         case LedBackendType::MACRO: {
             // Find the macro device matching this strip_id (by display name)
             std::string raw_name = strip_macro_name(strip_id);
+            if (raw_name.empty()) {
+                spdlog::warn("[LedController] toggle_all: skipping macro strip with empty name");
+                break;
+            }
             for (const auto& macro : configured_macros_) {
                 if (macro.display_name == raw_name) {
                     switch (macro.type) {
@@ -2070,7 +2078,15 @@ void LedController::set_color_presets(const std::vector<uint32_t>& presets) {
 }
 
 void LedController::set_configured_macros(const std::vector<LedMacroInfo>& macros) {
-    configured_macros_ = macros;
+    configured_macros_.clear();
+    configured_macros_.reserve(macros.size());
+    for (const auto& m : macros) {
+        if (!m.display_name.empty()) {
+            configured_macros_.push_back(m);
+        } else {
+            spdlog::warn("[LedController] Skipping macro with empty display name");
+        }
+    }
 }
 
 void LedController::rebuild_macro_backend() {
