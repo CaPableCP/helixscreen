@@ -925,7 +925,9 @@ void InputShaperPanel::on_calibration_result(const InputShaperResult& result) {
     bool was_calibrate_all = calibrate_all_mode_;
     calibrate_all_mode_ = false;
 
-    // Clear per-axis results
+    // Clear per-axis results and chart state for clean re-population
+    clear_chart('X');
+    clear_chart('Y');
     lv_subject_set_int(&is_results_has_x_, 0);
     lv_subject_set_int(&is_results_has_y_, 0);
 

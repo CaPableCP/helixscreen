@@ -1036,9 +1036,10 @@ class InputShaperCollector : public std::enable_shared_from_this<InputShaperColl
             return;
         }
 
-        // If we already have the recommendation but got a non-CSV line, complete now
+        // If we have the recommendation, keep waiting for the CSV path line.
+        // Don't complete early on unrelated G-code responses (e.g., temperature
+        // reports) — that would discard the CSV data needed for frequency charts.
         if (collector_state_ == CollectorState::COMPLETE) {
-            complete_success();
             return;
         }
 
