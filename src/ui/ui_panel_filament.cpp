@@ -1015,6 +1015,12 @@ void FilamentPanel::update_external_spool_from_state() {
             } else {
                 mat_text = "Unknown";
             }
+            // Append Spoolman spool ID when linked (e.g., "Prusament PLA #129")
+            if (ext->spoolman_id > 0) {
+                char id_buf[16];
+                snprintf(id_buf, sizeof(id_buf), " #%d", ext->spoolman_id);
+                mat_text += id_buf; // i18n: do not translate — Spoolman ID
+            }
             lv_label_set_text(external_spool_material_label_, mat_text.c_str());
         }
         if (external_spool_color_label_) {

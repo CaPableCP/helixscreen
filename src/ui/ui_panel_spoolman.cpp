@@ -427,6 +427,36 @@ void SpoolmanPanel::set_active_spool(int spool_id) {
 
                 active_spool_id_ = spool_id;
                 update_active_indicators();
+
+                // Update external spool info so filament panel stays in sync
+                if (found) {
+                    SlotInfo slot;
+                    slot.slot_index = -2;
+                    slot.global_index = -2;
+                    slot.spoolman_id = found->id;
+                    slot.spoolman_filament_id = found->filament_id;
+                    slot.spoolman_vendor_id = found->vendor_id;
+                    slot.material = found->material;
+                    slot.brand = found->vendor;
+                    slot.color_name = found->color_name;
+                    slot.spool_name = found->display_name();
+                    slot.multi_color_hexes = found->multi_color_hexes;
+                    slot.nozzle_temp_min = found->nozzle_temp_min;
+                    slot.nozzle_temp_max = found->nozzle_temp_max;
+                    slot.bed_temp = found->bed_temp_recommended;
+                    slot.remaining_weight_g =
+                        static_cast<float>(found->remaining_weight_g);
+                    slot.total_weight_g =
+                        static_cast<float>(found->initial_weight_g);
+                    if (!found->color_hex.empty()) {
+                        const char* hex = found->color_hex.c_str();
+                        if (hex[0] == '#')
+                            hex++;
+                        slot.color_rgb = std::strtoul(hex, nullptr, 16);
+                    }
+                    AmsState::instance().set_external_spool_info(slot);
+                }
+
                 std::string msg = std::string(lv_tr("Active")) + ": " + spool_name;
                 ToastManager::instance().show(ToastSeverity::SUCCESS, msg.c_str(), 2000);
             });
