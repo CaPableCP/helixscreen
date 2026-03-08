@@ -124,12 +124,24 @@ jobs:
     - name: Fix permissions
       run: chmod +x build/bin/helix-screen build/bin/helix-tests
 
-    - name: Run all tests (including slow)
+    - name: Run all tests (including slow) with parallel sharding
       timeout-minutes: 20
       run: |
-        echo "::group::Test run"
-        ./build/bin/helix-tests "~[.]" --durations yes
-        echo "::endgroup::"
+        NPROCS=$(( $(nproc) * 2 ))
+        echo "Running $NPROCS test shards in parallel (including slow tests)..."
+        pids=""
+        for i in $(seq 0 $((NPROCS-1))); do
+          ./build/bin/helix-tests "~[.]" --shard-count $NPROCS --shard-index $i --durations yes 2>&1 | sed "s/^/[shard $i] /" &
+          pids="$pids $!"
+        done
+        failed=0
+        for pid in $pids; do
+          wait $pid || failed=1
+        done
+        if [ $failed -eq 1 ]; then
+          echo "One or more test shards failed!"
+          exit 1
+        fi
         echo "All tests passed (including slow)"
 
   # ===========================================================================

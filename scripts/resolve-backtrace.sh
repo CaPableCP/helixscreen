@@ -29,7 +29,7 @@ prune_cache() {
     count=$(find "$CACHE_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
     if [[ "$count" -gt "$CACHE_RETAIN_COUNT" ]]; then
         local to_delete
-        to_delete=$(ls -1dt "$CACHE_DIR"/v*/ 2>/dev/null | tail -n +"$((CACHE_RETAIN_COUNT + 1))")
+        to_delete=$(find "$CACHE_DIR" -mindepth 1 -maxdepth 1 -type d -name 'v*' -printf '%T@\t%p\n' 2>/dev/null | sort -rn | tail -n +"$((CACHE_RETAIN_COUNT + 1))" | cut -f2-)
         if [[ -n "$to_delete" ]]; then
             echo "Pruning local cache (keeping $CACHE_RETAIN_COUNT most recent)..." >&2
             echo "$to_delete" | while read -r dir; do

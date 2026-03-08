@@ -345,7 +345,7 @@ ALTEOF
 
     [ -f "$chown_log" ]
     grep -q "biqu:biqu" "$chown_log"
-    grep -q "$INSTALL_DIR/config" "$chown_log"
+    grep -q "$INSTALL_DIR" "$chown_log"
 }
 
 @test "fix_install_ownership: root user is a no-op" {

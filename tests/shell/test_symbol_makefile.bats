@@ -13,14 +13,12 @@ setup_file() {
 }
 
 @test "symbols target is defined in Makefile" {
-    run make -n symbols 2>&1
-    # Should not say "No rule to make target"
-    [[ "$output" != *"No rule to make target"* ]]
+    # Use make database (cached) instead of make -n which fails without deps
+    grep -q '^symbols:' "$MAKE_DB_CACHE"
 }
 
 @test "strip target is defined in Makefile" {
-    run make -n strip 2>&1
-    [[ "$output" != *"No rule to make target"* ]]
+    grep -q '^strip:' "$MAKE_DB_CACHE"
 }
 
 @test "symbols and strip are in .PHONY" {

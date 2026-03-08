@@ -119,5 +119,8 @@ setup() {
     cp "$SERVICE_TEMPLATE" "$BATS_TEST_TMPDIR/test.service"
     sed -i '' "s|@@HELIX_USER@@|biqu|g;s|@@HELIX_GROUP@@|biqu|g;s|@@INSTALL_DIR@@|/opt/helixscreen|g" "$BATS_TEST_TMPDIR/test.service" 2>/dev/null || \
     sed -i "s|@@HELIX_USER@@|biqu|g;s|@@HELIX_GROUP@@|biqu|g;s|@@INSTALL_DIR@@|/opt/helixscreen|g" "$BATS_TEST_TMPDIR/test.service"
-    ! grep -q '@@' "$BATS_TEST_TMPDIR/test.service"
+    # Line 47 intentionally preserves @@HELIX_USER@@ in a runtime self-heal command
+    # using quote-splitting (@@""HELIX_USER""@@) to survive the installer's sed pass.
+    # Exclude that line when checking for un-substituted markers.
+    ! grep -v '@@""HELIX_USER""@@' "$BATS_TEST_TMPDIR/test.service" | grep -q '@@'
 }

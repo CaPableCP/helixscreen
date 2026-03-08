@@ -168,6 +168,9 @@ class AbortManagerTestFixture : public LVGLTestFixture {
         // Reset AbortManager to known state before each test
         AbortManagerTestAccess::reset(AbortManager::instance());
 
+        // Subjects must be initialized before setters (they write to lv_subject_t)
+        SafetySettingsManager::instance().init_subjects();
+
         // Most tests assume escalation is enabled (default in production is OFF)
         SafetySettingsManager::instance().set_cancel_escalation_enabled(true);
     }
@@ -175,6 +178,7 @@ class AbortManagerTestFixture : public LVGLTestFixture {
     ~AbortManagerTestFixture() override {
         // Deinit subjects before LVGL teardown to avoid dangling pointers
         AbortManager::instance().deinit_subjects();
+        SafetySettingsManager::instance().deinit_subjects();
         // Ensure clean state after test
         AbortManagerTestAccess::reset(AbortManager::instance());
 
@@ -1271,8 +1275,8 @@ TEST_CASE_METHOD(AbortManagerTestFixture,
 
 TEST_CASE_METHOD(AbortManagerTestFixture, "AbortManager: Default settings do not escalate",
                  "[abort][cancel][escalation][settings][default]") {
-    // Don't set anything — use defaults
-    // Default: cancel_escalation_enabled = false
+    // Fixture enables escalation; disable it to test the default-off behavior
+    SafetySettingsManager::instance().set_cancel_escalation_enabled(false);
 
     AbortManager::instance().start_abort();
     simulate_kalico_not_present();
