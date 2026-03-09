@@ -1,0 +1,13 @@
+<project>
+    <folders>
+        <!-- 告诉编辑器，你的 UI 组件文件在 ui_xml 文件夹里 -->
+        <folder path="./ui_xml"/>
+    </folders>
+
+    <targets>
+        <!-- 根据你的硬件屏幕尺寸配置一个预览目标 -->
+        <target name="your_device">
+            <display width="480" height="320" color_format="RGB565"/>
+        </target>
+    </targets>
+</project>
