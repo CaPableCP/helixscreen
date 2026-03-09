@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+<globals>
+    <!-- ===================================================================== -->
+    <!-- API 部分：如果项目有自定义枚举，可在此定义，否则留空                  -->
+    <!-- ===================================================================== -->
+    <api>
+    </api>
+
+    <!-- ===================================================================== -->
+    <!-- 常量部分：所有尺寸、颜色、图标常量保留在此                             -->
+    <!-- ===================================================================== -->
+    <consts>
+        <!-- 你的原有注释保留，此处略... 请将原来 <consts> 内的所有内容原样复制到这里！ -->
+        <!-- 包括所有的 <px>, <percentage>, <color>, <str> 等，一个都不要少。   -->
+        <!-- 例如：                                                             -->
+        <!-- <px name="nav_padding" value="16"/>                                -->
+        <!-- <color name="step_pending" value="#4c566a"/>                       -->
+        <!-- <str name="icon_alert" value="󰀦"/>                                 -->
+        <!-- 等等...                                                             -->
+        
+        <!-- ⚠️ 重要：为了方便在编辑器中预览，建议为当前目标屏幕定义一套基础常量（如下示例），
+             否则界面中引用的 #space_xxs 等可能会找不到。你可以根据屏幕尺寸选择合适的值。 -->
+        <px name="space_xxs" value="3"/>      <!-- 对应 space_xxs_medium -->
+        <px name="space_xs" value="5"/>       <!-- 对应 space_xs_medium -->
+        <px name="space_sm" value="7"/>       <!-- 对应 space_sm_medium -->
+        <px name="space_md" value="10"/>      <!-- 对应 space_md_medium -->
+        <px name="space_lg" value="16"/>      <!-- 对应 space_lg_medium -->
+        <px name="space_xl" value="20"/>      <!-- 对应 space_xl_medium -->
+        <px name="space_2xl" value="32"/>     <!-- 对应 space_2xl_medium -->
+        <px name="space_2xl_neg" value="-32"/><!-- 对应 space_2xl_neg_medium -->
+    </consts>
+
+    <!-- ===================================================================== -->
+    <!-- 样式部分：如果项目中定义了全局样式，请在此添加                         -->
+    <!-- ===================================================================== -->
+    <styles>
+        <!-- 你之前在 XML 中使用的 image_dimmed 样式 -->
+        <style name="image_dimmed" image_opa="128"/>
+        <!-- 如果有其他全局样式，可以继续添加 -->
+    </styles>
+
+    <!-- ===================================================================== -->
+    <!-- 主题变量部分：留空，你的项目通过 C++ 代码动态注册 subject              -->
+    <!-- ===================================================================== -->
+    <subjects>
+    </subjects>
+
+    <!-- ===================================================================== -->
+    <!-- 图片资源部分：将原来 <consts> 中的图片路径常量迁移至此                 -->
+    <!-- 注意：src 属性使用了 A: 前缀，指向项目根目录下的 assets 文件夹        -->
+    <!-- ===================================================================== -->
+    <images>
+        <!-- 卡片渐变图片 -->
+        <file name="gradient_card_small_dark" src="A:assets/images/gradient-card-small-dark.bin"/>
+        <file name="gradient_card_small_light" src="A:assets/images/gradient-card-small-light.bin"/>
+        <file name="gradient_card_medium_dark" src="A:assets/images/gradient-card-medium-dark.bin"/>
+        <file name="gradient_card_medium_light" src="A:assets/images/gradient-card-medium-light.bin"/>
+        <file name="gradient_card_large_dark" src="A:assets/images/gradient-card-large-dark.bin"/>
+        <file name="gradient_card_large_light" src="A:assets/images/gradient-card-large-light.bin"/>
+        <!-- 面板渐变图片 -->
+        <file name="gradient_panel_medium_dark" src="A:assets/images/gradient-panel-medium-dark.bin"/>
+        <file name="gradient_panel_medium_light" src="A:assets/images/gradient-panel-medium-light.bin"/>
+        <file name="gradient_panel_large_dark" src="A:assets/images/gradient-panel-large-dark.bin"/>
+        <file name="gradient_panel_large_light" src="A:assets/images/gradient-panel-large-light.bin"/>
+        <!-- 其他图片，请根据实际需要添加，例如： -->
+        <!-- <file name="benchy_thumbnail_white" src="A:assets/images/benchy_thumbnail_white.png"/> -->
+    </images>
+
+    <!-- ===================================================================== -->
+    <!-- 字体资源部分：将原来 <consts> 中的字体常量迁移至此                     -->
+    <!-- 注意：你既有 .ttf 文件，也有 .c 文件。为了在编辑器中预览，我们统一使用   -->
+    <!--      <tiny_ttf> 标签引用 .ttf 文件，并设置 as_file="true"。这样编辑器  -->
+    <!--      会从文件系统加载字体进行预览，导出代码时也会包含正确的引用。       -->
+    <!--      字体名称需要与你 XML 中引用的名称完全一致。                       -->
+    <!-- ===================================================================== -->
+    <fonts>
+        <!-- Noto Sans Regular 系列 -->
+        <tiny_ttf name="noto_sans_11" src_path="A:assets/fonts/NotoSans-Regular.ttf" size="11" as_file="true"/>
+        <tiny_ttf name="noto_sans_14" src_path="A:assets/fonts/NotoSans-Regular.ttf" size="14" as_file="true"/>
+        <tiny_ttf name="noto_sans_16" src_path="A:assets/fonts/NotoSans-Regular.ttf" size="16" as_file="true"/>
+        <tiny_ttf name="noto_sans_18" src_path="A:assets/fonts/NotoSans-Regular.ttf" size="18" as_file="true"/>
+        <tiny_ttf name="noto_sans_20" src_path="A:assets/fonts/NotoSans-Regular.ttf" size="20" as_file="true"/>
+        <tiny_ttf name="noto_sans_24" src_path="A:assets/fonts/NotoSans-Regular.ttf" size="24" as_file="true"/>
+        <tiny_ttf name="noto_sans_26" src_path="A:assets/fonts/NotoSans-Regular.ttf" size="26" as_file="true"/>
+        <tiny_ttf name="noto_sans_28" src_path="A:assets/fonts/NotoSans-Regular.ttf" size="28" as_file="true"/>
+
+        <!-- Noto Sans Bold 系列 -->
+        <tiny_ttf name="noto_sans_bold_14" src_path="A:assets/fonts/NotoSans-Bold.ttf" size="14" as_file="true"/>
+        <tiny_ttf name="noto_sans_bold_16" src_path="A:assets/fonts/NotoSans-Bold.ttf" size="16" as_file="true"/>
+        <tiny_ttf name="noto_sans_bold_18" src_path="A:assets/fonts/NotoSans-Bold.ttf" size="18" as_file="true"/>
+        <tiny_ttf name="noto_sans_bold_20" src_path="A:assets/fonts/NotoSans-Bold.ttf" size="20" as_file="true"/>
+        <tiny_ttf name="noto_sans_bold_24" src_path="A:assets/fonts/NotoSans-Bold.ttf" size="24" as_file="true"/>
+        <tiny_ttf name="noto_sans_bold_28" src_path="A:assets/fonts/NotoSans-Bold.ttf" size="28" as_file="true"/>
+
+        <!-- Noto Sans Light 系列 -->
+        <tiny_ttf name="noto_sans_light_10" src_path="A:assets/fonts/NotoSans-Light.ttf" size="10" as_file="true"/>
+        <tiny_ttf name="noto_sans_light_11" src_path="A:assets/fonts/NotoSans-Light.ttf" size="11" as_file="true"/>
+        <tiny_ttf name="noto_sans_light_12" src_path="A:assets/fonts/NotoSans-Light.ttf" size="12" as_file="true"/>
+        <tiny_ttf name="noto_sans_light_14" src_path="A:assets/fonts/NotoSans-Light.ttf" size="14" as_file="true"/>
+        <tiny_ttf name="noto_sans_light_16" src_path="A:assets/fonts/NotoSans-Light.ttf" size="16" as_file="true"/>
+        <tiny_ttf name="noto_sans_light_18" src_path="A:assets/fonts/NotoSans-Light.ttf" size="18" as_file="true"/>
+
+        <!-- Source Code Pro 系列 -->
+        <tiny_ttf name="source_code_pro_10" src_path="A:assets/fonts/SourceCodePro-Regular.ttf" size="10" as_file="true"/>
+        <tiny_ttf name="source_code_pro_12" src_path="A:assets/fonts/SourceCodePro-Regular.ttf" size="12" as_file="true"/>
+        <tiny_ttf name="source_code_pro_14" src_path="A:assets/fonts/SourceCodePro-Regular.ttf" size="14" as_file="true"/>
+        <tiny_ttf name="source_code_pro_16" src_path="A:assets/fonts/SourceCodePro-Regular.ttf" size="16" as_file="true"/>
+
+        <!-- Material Design Icons 字体 -->
+        <tiny_ttf name="mdi_icons_14" src_path="A:assets/fonts/materialdesignicons-webfont.ttf" size="14" as_file="true"/>
+        <tiny_ttf name="mdi_icons_16" src_path="A:assets/fonts/materialdesignicons-webfont.ttf" size="16" as_file="true"/>
+        <tiny_ttf name="mdi_icons_24" src_path="A:assets/fonts/materialdesignicons-webfont.ttf" size="24" as_file="true"/>
+        <tiny_ttf name="mdi_icons_32" src_path="A:assets/fonts/materialdesignicons-webfont.ttf" size="32" as_file="true"/>
+        <tiny_ttf name="mdi_icons_48" src_path="A:assets/fonts/materialdesignicons-webfont.ttf" size="48" as_file="true"/>
+        <tiny_ttf name="mdi_icons_64" src_path="A:assets/fonts/materialdesignicons-webfont.ttf" size="64" as_file="true"/>
+    </fonts>
+</globals>
